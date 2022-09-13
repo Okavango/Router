@@ -9,12 +9,12 @@ const func: DeployFunction = async function ({
 
   const { deployer } = await getNamedAccounts();
 
-  const { address } = await deploy("Greeter", {
+  const { address } = await deploy("Router", {
     from: deployer,
     args: ["Hello, world!"],
   });
 
-  console.log(`Greeter deployed to ${address}`);
+  console.log(`Router deployed to ${address}`);
 };
 
 export default func;

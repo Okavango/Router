@@ -1,16 +1,8 @@
 {
-  "name": "hardhat-foundation",
-  "description": "Hardhat foundation",
-  "keywords": [
-    "hardhat"
-  ],
-  "homepage": "https://github.com/sushiswap/hardhat-foundation#readme",
-  "bugs": {
-    "url": "https://github.com/sushiswap/hardhat-foundation/issues",
-    "email": "bugs@sushi.com"
-  },
+  "name": "router",
+  "description": "Router",
   "license": "MIT",
-  "author": "Matthew Lilley <hello@matthewlilley.com>",
+  "author": "Ilya Lyalin",
   "scripts": {
     "build": "hardhat compile",
     "console": "hardhat console",
