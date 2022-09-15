@@ -4,12 +4,17 @@ pragma solidity 0.8.11;
 
 import "../interfaces/IERC20.sol";
 
+uint constant BALANCE_NUM = 20;
+
 contract Router {
 
   // To be used in UI. For External Owner Account only
   function processRouteEOA(bytes calldata route) external payable {
     require(tx.origin == msg.sender, "Call from not EOA");      // Prevents reentrance and usage in hacker attacks
+
     uint position = 0;
+    uint[BALANCE_NUM] memory balances;
+
     while(position < route.length) {
       uint8 commandCode = uint8(route[position]);
       if (commandCode == 1) { // send ERC20 tokens from this contract to an address
@@ -18,10 +23,22 @@ contract Router {
         position = sendERC20Share(route, position + 1);
       } else if (commandCode == 3) { // transfer ERC20 tokens from an address to an address
         position = transferERC20(route, position + 1);
+
       } else if (commandCode == 10) { // call a function of a contract
         position = contractCall(route, position + 1);
       } else if (commandCode == 11) { // call a function of a contract with {value: x, gas: y}
         position = contractCallValueGas(route, position + 1);
+
+      } else if (commandCode == 20) { // checks self ETH balance
+        position = checkSelfBalanceETH(route, position + 1);
+      } else if (commandCode == 21) { // checks self ERC20 balance
+        position = checkSelfBalanceERC20(route, position + 1);
+      } else if (commandCode == 22) { // returns ERC20 balance of an address
+        position = getBalanceERC20(route, position + 1, balances);
+        //balances.push(currentBalance);
+      } else if (commandCode == 23) { // checks an address ERC20 balance increasing
+        position = checkBalanceERC20(route, position + 1, balances);
+
       } else revert("Unknown command code");
     }
   }
@@ -101,6 +118,48 @@ contract Router {
     require(result, string(returnData));
     
     return position + callDataSize;
+  }
+
+  function checkSelfBalanceETH(bytes calldata route, uint position) private view returns (uint) {
+    (uint amountMin) = abi.decode(route[position:], (uint));
+    require(address(this).balance >= amountMin, "Insufficient ETH liquidity");
+
+    return position + 32;
+  }
+
+  function checkSelfBalanceERC20(bytes calldata route, uint position) private  view returns (uint) {
+    (address token, uint amountMin) = abi.decode(route[position:], (address, uint));
+    require(IERC20(token).balanceOf(address(this)) >= amountMin, "Insufficient liquidity");
+
+    return position + 52;
+  }
+
+  function getBalanceERC20(
+    bytes calldata route, 
+    uint position, 
+    uint[BALANCE_NUM] memory balances
+  ) private view returns (uint) {
+    (address token, address host, uint8 n) = abi.decode(route[position:], (address, address, uint8));
+    require(n < BALANCE_NUM, "Wrong balance number");
+    balances[n] = IERC20(token).balanceOf(address(host));
+    return position + 41;
+  }
+
+  function checkBalanceERC20(
+    bytes calldata route, 
+    uint position, 
+    uint[BALANCE_NUM] memory balances
+  ) private view returns (uint) {
+    (address token, address host, uint8 n, uint amountMin) = abi.decode(
+      route[position:], 
+      (address, address, uint8, uint)
+    );
+    require(n < BALANCE_NUM, "Wrong balance number");
+
+    uint currentBalance = IERC20(token).balanceOf(address(host));
+    require(balances[n] + amountMin <= currentBalance, "Insufficient liquidity");
+
+    return position + 73;
   }
 
 }
