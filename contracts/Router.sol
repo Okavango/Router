@@ -13,24 +13,40 @@ contract Router {
     while(position < route.length) {
       uint8 commandCode = uint8(route[position]);
       if (commandCode == 1) { // send ERC20 tokens from this contract to an address
-        position = sendERC20Share(route, position + 1);
+        position = sendETHShare(route, position + 1);
       } else if (commandCode == 2) { // transfer ERC20 tokens from an address to an address
+        position = sendERC20Share(route, position + 1);
+      } else if (commandCode == 3) { // transfer ERC20 tokens from an address to an address
         position = transferERC20(route, position + 1);
       } else if (commandCode == 10) { // call a function of a contract
         position = contractCall(route, position + 1);
-      } else if (commandCode == 11) { // call a function of a contract
+      } else if (commandCode == 11) { // call a function of a contract with {value: x, gas: y}
         position = contractCallValueGas(route, position + 1);
       } else revert("Unknown command code");
     }
   }
 
+  // Sends ETH from this contract.
+  function sendETHShare(bytes calldata route, uint position) private returns (uint) {
+    (address payable to, uint16 share) = abi.decode(route[position:], (address, uint16));    
+
+    uint amount; unchecked {
+      amount = address(this).balance * share/65535;
+    }
+    to.transfer(amount);
+
+    return position + 22;
+  }
+
   // Sends ERC20 tokens from this contract.
   function sendERC20Share(bytes calldata route, uint position) private returns (uint) {
     (address token, address to, uint16 share) = abi.decode(route[position:], (address, address, uint16));
-    unchecked {
-      uint amount = IERC20(token).balanceOf(address(this))*share/65535;
-      IERC20(token).transfer(to, amount);
+
+    uint amount; unchecked {
+      amount = IERC20(token).balanceOf(address(this))*share/65535;
     }
+    IERC20(token).transfer(to, amount);
+
     return position + 42;
   }
 
@@ -42,7 +58,7 @@ contract Router {
     );
     IERC20(token).transferFrom(msg.sender, to, amount);
     
-    return position + 82;
+    return position + 72;
   }
 
   // Calls a function of a contract
@@ -66,11 +82,23 @@ contract Router {
     position += 28;
     bytes calldata callData = route[position:position + callDataSize];
 
-    unchecked {
-      uint value = address(this).balance * valueShare / 65535;
-      (bool result, bytes memory returnData) = aContract.call{value: value, gas: gas}(callData);
-      require(result, string(returnData));
+    uint value; unchecked {
+      value = address(this).balance * valueShare / 65535;
     }
+
+    bool result;
+    bytes memory returnData;
+    if (value != 0) {
+      if (gas != 0) {
+        (result, returnData) = aContract.call{value: value, gas: gas}(callData);
+      } else {
+        (result, returnData) = aContract.call{value: value}(callData);
+      }
+    } else {
+      (result, returnData) = aContract.call{gas: gas}(callData);
+      // use 'contractCall' function for case with no gas neither value
+    }
+    require(result, string(returnData));
     
     return position + callDataSize;
   }
