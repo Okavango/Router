@@ -3,7 +3,11 @@ import {getBigNumber, MultiRoute, RouteLeg, RouteStatus, RToken} from "@sushiswa
 import { assert } from "console";
 import { BigNumber, ethers } from "ethers";
 
-export function tinesToRouter(route: MultiRoute, routerAddress: string, toAddress: string): string {
+export function tinesToRouteProcessorCode(
+  route: MultiRoute, 
+  routeProcessorAddress: string, 
+  toAddress: string
+): string {
   // 0. Check for no route
   if (route.status == RouteStatus.NoWay || route.legs.length == 0) return ''
 
@@ -25,7 +29,7 @@ export function tinesToRouter(route: MultiRoute, routerAddress: string, toAddres
   assert(inputAmountPrevious.eq(route.amountInBN))
 
   route.legs.forEach(l => {
-    // 3.1 Transfer tokens from the router to the pool if it is necessary
+    // 3.1 Transfer tokens from the routeProcessor contract to the pool if it is necessary
     const neibourLegs = tokenOutputLegs.get(l.tokenFrom.tokenId as string) as RouteLeg[]
     if (neibourLegs.length > 1 && l.tokenFrom != route.fromToken) {
       res += codeSendERC20(route.fromToken, l.poolAddress, l.swapPortion)
@@ -41,8 +45,8 @@ export function tinesToRouter(route: MultiRoute, routerAddress: string, toAddres
       // swap without fork - send swap's output directly to the next pool
       outAddress = outLegs[0].poolAddress
     } else {
-      // swap without further fork - send swap's output to the router
-      outAddress = routerAddress
+      // swap without further fork - send swap's output to the RouteProcessor
+      outAddress = routeProcessorAddress
     }
     res += codeSwap(l.poolAddress, l.tokenFrom, outAddress)
   })
@@ -77,7 +81,7 @@ function codeTransferERC20(token: RToken, poolAddress: string, amount: BigNumber
   return code
 }
 
-// Sends tokens from the router to a pool
+// Sends tokens from the RouteProcessor to a pool
 function codeSendERC20(token: RToken, poolAddress: string, share: number): string {
   const code = ethers.utils.defaultAbiCoder.encode(
     ["uint8", "address", "address", "uint"], 

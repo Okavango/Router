@@ -6,7 +6,7 @@ import "../interfaces/IERC20.sol";
 
 uint constant BALANCE_NUM = 20;
 
-contract Router {
+contract RouteProcessor {
 
   // To be used in UI. For External Owner Account only
   function processRouteEOA(bytes calldata route) external payable {
