@@ -3,10 +3,11 @@ import {getBigNumber, MultiRoute, RouteLeg, RouteStatus, RToken} from "@sushiswa
 import { assert } from "console";
 import { BigNumber, ethers } from "ethers";
 
-export function tinesToRouteProcessorCode(
+export function getRouteProcessorCode(
   route: MultiRoute, 
   routeProcessorAddress: string, 
-  toAddress: string
+  toAddress: string,
+  minLiquidity: BigNumber
 ): string {
   // 0. Check for no route
   if (route.status == RouteStatus.NoWay || route.legs.length == 0) return ''
@@ -50,6 +51,9 @@ export function tinesToRouteProcessorCode(
     }
     res += codeSwap(l.poolAddress, l.tokenFrom, outAddress)
   })
+
+  // 4. TODO: check minoutput
+  res += codeCheckBalance(route.toToken, toAddress, 0, minLiquidity)
 
   return res;
 }
@@ -97,6 +101,14 @@ function codeRememberBalance(token: RToken, address: string, slot: number): stri
     [22, token.address, address, slot]
   );
   assert(code.length == 42)
+  return code
+}
+function codeCheckBalance(token: RToken, address: string, slot: number, minLiquidity: BigNumber): string {
+  const code = ethers.utils.defaultAbiCoder.encode(
+    ["uint8", "address", "address", "uint8", "uint"], 
+    [23, token.address, address, slot, minLiquidity]
+  );
+  assert(code.length == 74)
   return code
 }
 
