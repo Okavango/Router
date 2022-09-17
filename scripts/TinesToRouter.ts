@@ -2,12 +2,14 @@
 import {getBigNumber, MultiRoute, RouteLeg, RouteStatus, RToken} from "@sushiswap/tines"
 import { assert } from "console";
 import { BigNumber, ethers } from "ethers";
+import { PoolRegistarator } from "./liquidityProviders/LiquidityProvider";
 
 export function getRouteProcessorCode(
   route: MultiRoute, 
   routeProcessorAddress: string, 
   toAddress: string,
-  minLiquidity: BigNumber
+  minLiquidity: BigNumber,
+  reg: PoolRegistarator
 ): string {
   // 0. Check for no route
   if (route.status == RouteStatus.NoWay || route.legs.length == 0) return ''
@@ -49,7 +51,7 @@ export function getRouteProcessorCode(
       // swap without further fork - send swap's output to the RouteProcessor
       outAddress = routeProcessorAddress
     }
-    res += codeSwap(l.poolAddress, l.tokenFrom, outAddress)
+    res += codeSwap(l.poolAddress, l.tokenFrom, outAddress, reg)
   })
 
   // 4. TODO: check minoutput
@@ -112,6 +114,11 @@ function codeCheckBalance(token: RToken, address: string, slot: number, minLiqui
   return code
 }
 
-function codeSwap(poolAddress: string, tokenFrom: RToken, toAddress: string): string {
-  // To implement
+function codeSwap(poolAddress: string, tokenFrom: RToken, toAddress: string, reg: PoolRegistarator): string {
+  const provider = reg.getProvider(poolAddress)
+  if (provider !== undefined) {
+    return provider.gatSwapCodeForRouteProcessor(poolAddress, tokenFrom.address, toAddress)
+  } else {
+    throw new Error("unknown pool: " + poolAddress)
+  }
 }
