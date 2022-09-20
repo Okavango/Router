@@ -10,40 +10,38 @@ contract RouteProcessor {
 
   // To be used in UI. For External Owner Account only
   function processRouteEOA(bytes calldata route) external payable {
-    require(tx.origin == msg.sender, "Call from not EOA");      // Prevents reentrance and usage in hacker attacks
+    require(tx.origin == msg.sender, "Call from not EOA");      // Prevents reentrance
 
-    uint position = 0;
-    uint[BALANCE_NUM] memory balances;
+    uint position = 0;  // current reading position in route
+    uint[BALANCE_NUM] memory balances; // Array of remembered initial balances - for amountOunMin checking
 
     while(position < route.length) {
       uint8 commandCode = uint8(route[position]);
-      if (commandCode == 1) { // send ERC20 tokens from this contract to an address
+      if        (commandCode == 1) { // send ETH from this contract to an address
         position = sendETHShare(route, position + 1);
-      } else if (commandCode == 2) { // transfer ERC20 tokens from an address to an address
+      } else if (commandCode == 2) { // send ERC20 tokens from this router to an address
         position = sendERC20Share(route, position + 1);
-      } else if (commandCode == 3) { // transfer ERC20 tokens from an address to an address
+      } else if (commandCode == 3) { // transfer ERC20 tokens from msg.sender to an address
         position = transferERC20(route, position + 1);
 
-      } else if (commandCode == 10) { // call a function of a contract
+      } else if (commandCode == 10) { // call a function of a contract - pool.swap for example
         position = contractCall(route, position + 1);
       } else if (commandCode == 11) { // call a function of a contract with {value: x, gas: y}
         position = contractCallValueGas(route, position + 1);
 
-      } else if (commandCode == 20) { // checks self ETH balance
+      } else if (commandCode == 20) { // checks self ETH balance - for amountOutMin checks
         position = checkSelfBalanceETH(route, position + 1);
-      } else if (commandCode == 21) { // checks self ERC20 balance
+      } else if (commandCode == 21) { // checks self ERC20 balance - for amountOutMin checks
         position = checkSelfBalanceERC20(route, position + 1);
-      } else if (commandCode == 22) { // returns ERC20 balance of an address
+      } else if (commandCode == 22) { // remembers initial ERC20 balance of an address - for amountOutMin checks
         position = getBalanceERC20(route, position + 1, balances);
-        //balances.push(currentBalance);
-      } else if (commandCode == 23) { // checks an address ERC20 balance increasing
+      } else if (commandCode == 23) { // checks an address ERC20 balance increasing - for amountOutMin checks
         position = checkBalanceERC20(route, position + 1, balances);
-
       } else revert("Unknown command code");
     }
   }
 
-  // Sends ETH from this contract.
+  // Send ETH from this contract to an address
   function sendETHShare(bytes calldata route, uint position) private returns (uint) {
     (address payable to, uint16 share) = abi.decode(route[position:], (address, uint16));    
 
@@ -55,7 +53,9 @@ contract RouteProcessor {
     return position + 22;
   }
 
-  // Sends ERC20 tokens from this contract.
+  // Send ERC20 tokens from this router to an address. Quantity for sending is determined by share in 1/65535.
+  // During routing we can't predict in advance the actual value of internal swaps because of slippage,
+  // so we have to work with shares - not fixed amounts
   function sendERC20Share(bytes calldata route, uint position) private returns (uint) {
     (address token, address to, uint16 share) = abi.decode(route[position:], (address, address, uint16));
 
@@ -68,6 +68,7 @@ contract RouteProcessor {
   }
 
   // Transfers ERC20 tokens from an address to an address. Tokens should be approved
+  // Expected to be launched for initial liquidity distribution fro user to pools, so we know exact amounts
   function transferERC20(bytes calldata route, uint position) private returns (uint) {
     (address token, address to, uint amount) = abi.decode(
       route[position:], 
@@ -78,7 +79,7 @@ contract RouteProcessor {
     return position + 72;
   }
 
-  // Calls a function of a contract
+  // Calls a function of a contract. Expected to be called for pool.swap functions
   function contractCall(bytes calldata route, uint position) private returns (uint) {
     (address aContract, uint16 callDataSize) = abi.decode(route[position:], (address, uint16));
     position += 22;
@@ -90,7 +91,7 @@ contract RouteProcessor {
     return position + callDataSize;
   }
 
-  // Calls a function of a contract with {value: x, gas: y}
+  // Calls a function of a contract with {value: x, gas: y}. Expected to be called for pool.swap functions
   function contractCallValueGas(bytes calldata route, uint position) private returns (uint) {
     (address aContract, uint16 valueShare, uint32 gas, uint16 callDataSize) = abi.decode(
       route[position:], 
@@ -120,6 +121,7 @@ contract RouteProcessor {
     return position + callDataSize;
   }
 
+  // Checks self ETH balance - for amountOutMin checks
   function checkSelfBalanceETH(bytes calldata route, uint position) private view returns (uint) {
     (uint amountMin) = abi.decode(route[position:], (uint));
     require(address(this).balance >= amountMin, "Insufficient ETH liquidity");
@@ -127,6 +129,7 @@ contract RouteProcessor {
     return position + 32;
   }
 
+  // Checks self ERC20 balance - for amountOutMin checks
   function checkSelfBalanceERC20(bytes calldata route, uint position) private  view returns (uint) {
     (address token, uint amountMin) = abi.decode(route[position:], (address, uint));
     require(IERC20(token).balanceOf(address(this)) >= amountMin, "Insufficient liquidity");
@@ -134,6 +137,8 @@ contract RouteProcessor {
     return position + 52;
   }
 
+  // Remembers initial ERC20 balance of an address - for amountOutMin checks
+  // Supposed to be called before routing
   function getBalanceERC20(
     bytes calldata route, 
     uint position, 
@@ -145,6 +150,7 @@ contract RouteProcessor {
     return position + 41;
   }
 
+  // Checks an address ERC20 balance increasing. Supposed to be called after routing
   function checkBalanceERC20(
     bytes calldata route, 
     uint position, 
