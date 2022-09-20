@@ -51,7 +51,7 @@ export function getRouteProcessorCode(
       // swap without further fork - send swap's output to the RouteProcessor
       outAddress = routeProcessorAddress
     }
-    res += codeSwap(l.poolAddress, l.tokenFrom, outAddress, reg)
+    res += codeSwap(l, outAddress, reg)
   })
 
   // 4. TODO: check minoutput
@@ -114,11 +114,11 @@ function codeCheckBalance(token: RToken, address: string, slot: number, minLiqui
   return code
 }
 
-function codeSwap(poolAddress: string, tokenFrom: RToken, toAddress: string, reg: PoolRegistarator): string {
-  const provider = reg.getProvider(poolAddress)
+function codeSwap(leg: RouteLeg, toAddress: string, reg: PoolRegistarator): string {
+  const provider = reg.getProvider(leg.poolAddress)
   if (provider !== undefined) {
-    return provider.gatSwapCodeForRouteProcessor(poolAddress, tokenFrom.address, toAddress)
+    return provider.getSwapCodeForRouteProcessor(leg, toAddress)
   } else {
-    throw new Error("unknown pool: " + poolAddress)
+    throw new Error("unknown pool: " + leg.poolAddress)
   }
 }

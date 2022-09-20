@@ -1,4 +1,4 @@
-import { RPool } from "@sushiswap/tines"
+import { RouteLeg, RPool } from "@sushiswap/tines"
 import { Token } from "./EthereumTokens"
 
 export class PoolRegistarator {
@@ -21,5 +21,5 @@ export abstract class LiquidityProvider {
 
     // abstract updateData(): void;
     abstract getPools(t0: Token, t1: Token): Promise<RPool[]>;
-    // abstract gatSwapCodeForRouteProcessor(poolAddress: string, tokenFrom: string, toAddress: string): string;
+    abstract getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string): string;
 }

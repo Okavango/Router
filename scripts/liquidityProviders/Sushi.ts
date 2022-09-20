@@ -1,6 +1,6 @@
-import { ConstantProductRPool, RPool } from "@sushiswap/tines";
+import { ConstantProductRPool, RouteLeg, RPool } from "@sushiswap/tines";
 import {ethers} from 'ethers'
-import { LiquidityProvider } from "./LiquidityProvider";
+import { LiquidityProvider, PoolRegistarator } from "./LiquidityProvider";
 import * as ETHEREUM from './EthereumTokens'
 import {Token} from './EthereumTokens'
 import { getCreate2Address } from "ethers/lib/utils";
@@ -116,10 +116,32 @@ async function getAllPools(tokens: Token[]): Promise<RPool[]> {
 }
 
 export class SushiProvider extends LiquidityProvider {
+  pools: Map<string, RPool>
+
+  constructor(r: PoolRegistarator) {
+    super(r)
+    this.pools = new Map<string, RPool>()
+  }
+
   async getPools(t0: Token, t1: Token): Promise<RPool[]> {
     const tokens = getAllRouteTokens(t0, t1)
     const pools = await getAllPools(tokens)
-    this.registrator.addPools(pools, this)
+    this.registrator.addPools(pools.map(p => p.address), this)
+    pools.forEach(p => this.pools.set(p.address, p))
     return pools
+  }
+
+  getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string): string {
+    const {poolAddress, tokenFrom} = leg
+    const pool = this.pools.get(poolAddress)
+    if (pool === undefined) {
+      throw new Error("Unknown pool " + poolAddress)
+    } else {
+      if (tokenFrom.address !== pool.token0.address && tokenFrom.address !== pool.token1.address) {
+        throw new Error(`Unknown token ${tokenFrom.address} for the pool ${poolAddress}`)
+      }
+      // const [amount0Out, amount1Out] = tokenFrom == pool.token0.address ? []
+      // const res = '10' +
+    }
   }
 }
