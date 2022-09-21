@@ -140,8 +140,13 @@ export class SushiProvider extends LiquidityProvider {
       if (tokenFrom.address !== pool.token0.address && tokenFrom.address !== pool.token1.address) {
         throw new Error(`Unknown token ${tokenFrom.address} for the pool ${poolAddress}`)
       }
-      // const [amount0Out, amount1Out] = tokenFrom == pool.token0.address ? []
-      // const res = '10' +
+      // sendERC20Share = 0x20(address pool, address tokenIn, bool direction, address to)
+      const code = ethers.utils.defaultAbiCoder.encode(
+        ["uint8", "address", "address", "uint8", "address"], 
+        [20, poolAddress, tokenFrom.address, tokenFrom.address == pool.token0.address ? 1:0, toAddress]
+      )
+      console.assert(code.length == 74)
+      return code
     }
   }
 }

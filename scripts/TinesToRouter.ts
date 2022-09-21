@@ -117,7 +117,8 @@ function codeCheckBalance(token: RToken, address: string, slot: number, minLiqui
 function codeSwap(leg: RouteLeg, toAddress: string, reg: PoolRegistarator): string {
   const provider = reg.getProvider(leg.poolAddress)
   if (provider !== undefined) {
-    return provider.getSwapCodeForRouteProcessor(leg, toAddress)
+    const code = provider.getSwapCodeForRouteProcessor(leg, toAddress)
+    return code
   } else {
     throw new Error("unknown pool: " + leg.poolAddress)
   }
