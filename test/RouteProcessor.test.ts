@@ -5,7 +5,7 @@ import { RouteProcessor__factory } from "../types";
 describe("RouteProcessor", function () {
   it("Deploy check", async function () {
     const RouteProcessor: RouteProcessor__factory = await ethers.getContractFactory(
-      "RouteProcessor"
+      "RouteProcessor2"
     );
     const routeProcessor = await RouteProcessor.deploy();
 
