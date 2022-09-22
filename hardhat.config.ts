@@ -140,6 +140,9 @@ const config: HardhatUserConfig = {
       verbose: true,
     },
   },
+  mocha: {
+    timeout: 3600_000
+  }
 };
 
 // You need to export an object to set up your config

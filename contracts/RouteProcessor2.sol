@@ -15,7 +15,7 @@ contract RouteProcessor2 {
     uint amountOutMin,
     address to,
     bytes calldata route
-  ) external payable {
+  ) external payable  returns (uint amountOut){
     require(tx.origin == msg.sender, "Call from not EOA");      // Prevents reentrance
 
     uint amountInAcc = 0;
@@ -45,6 +45,8 @@ contract RouteProcessor2 {
     require(amountInAcc == amountIn, "Wrong amountIn value");
     uint balanceFinal = IERC20(tokenOut).balanceOf(to);
     require(balanceFinal >= balanceInitial + amountOutMin, "Minimal ouput balance violation");
+
+    amountOut = balanceFinal - balanceInitial;
   }
 
   // Send ERC20 tokens from this router to an address. Quantity for sending is determined by share in 1/65535.

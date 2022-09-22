@@ -4,6 +4,10 @@ import { Token } from "./EthereumTokens"
 export class PoolRegistarator {
     pools: Map<string, LiquidityProvider>
 
+    constructor() {
+        this.pools = new Map<string, LiquidityProvider>()
+    }
+
     addPools(pools: string[], provider: LiquidityProvider) {
         pools.forEach(p => this.pools.set(p, provider))
     }
