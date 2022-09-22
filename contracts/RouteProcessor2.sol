@@ -63,7 +63,7 @@ contract RouteProcessor2 {
     return position + 42;
   }
 
-  // Transfers ERC20 tokens from an address to an address. Tokens should be approved
+  // Transfers input tokens from msg.sender to an address. Tokens should be approved
   // Expected to be launched for initial liquidity distribution fro user to pools, so we know exact amounts
   function transferERC20Amount(address token, bytes calldata route, uint position) 
     private returns (uint amount, uint positionNew) {

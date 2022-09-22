@@ -6,6 +6,7 @@ import {Token} from './EthereumTokens'
 import { getCreate2Address } from "ethers/lib/utils";
 import { keccak256, pack } from '@ethersproject/solidity'
 import { SushiPoolABI } from "../../ABI/SushiPool";
+import { HEXer } from "../HEXer";
 
 export const BASES_TO_CHECK_TRADES_AGAINST = [
   ETHEREUM.WETH9,
@@ -144,11 +145,11 @@ export class SushiProvider extends LiquidityProvider {
         throw new Error(`Unknown token ${tokenFrom.address} for the pool ${poolAddress}`)
       }
       // sendERC20Share = 0x20(address pool, address tokenIn, bool direction, address to)
-      const code = ethers.utils.defaultAbiCoder.encode(
-        ["uint8", "address", "address", "uint8", "address"], 
-        [20, poolAddress, tokenFrom.address, tokenFrom.address == pool.token0.address ? 1:0, toAddress]
-      )
-      console.assert(code.length == 74)
+      const code = new HEXer()
+        .uint8(20).address(poolAddress)
+        .address(tokenFrom.address).bool(tokenFrom.address == pool.token0.address)
+        .address(toAddress).toString()
+      console.assert(code.length == 62*2, "Sushi.getSwapCodeForRouteProcessor unexpected code length")
       return code
     }
   }

@@ -2,13 +2,13 @@
 import {getBigNumber, MultiRoute, RouteLeg, RouteStatus, RToken} from "@sushiswap/tines"
 import { assert } from "console";
 import { BigNumber, ethers } from "ethers";
+import { HEXer } from "./HEXer";
 import { PoolRegistarator } from "./liquidityProviders/LiquidityProvider";
 
 export function getRouteProcessorCode(
   route: MultiRoute, 
   routeProcessorAddress: string, 
   toAddress: string,
-  minLiquidity: BigNumber,
   reg: PoolRegistarator
 ): string {
   // 0. Check for no route
@@ -16,11 +16,10 @@ export function getRouteProcessorCode(
 
   const tokenOutputLegs = getTokenOutputLegs(route)
   //const tokenTransferred = new Map<string, BigNumber>()
-  
-  // 1. Remember user's output balance
-  let res = codeRememberBalance(route.toToken, toAddress, 0)
 
-  // 2. Transfer route.amountIn input tokens from msg.sender to all input pools according to proportion 'leg.absolutePortion'
+  let res = '0x'
+
+  // 1. Transfer route.amountIn input tokens from msg.sender to all input pools according to proportion 'leg.absolutePortion'
   const inputLegs = tokenOutputLegs.get(route.fromToken.tokenId as string) as RouteLeg[]
   let inputAmountPrevious: BigNumber = BigNumber.from(0)
   inputLegs.forEach(l => {
@@ -29,16 +28,16 @@ export function getRouteProcessorCode(
     res += codeTransferERC20(route.fromToken, l.poolAddress, amount)
     inputAmountPrevious = inputAmountPrevious.add(amount)
   })
-  assert(inputAmountPrevious.eq(route.amountInBN))
+  assert(inputAmountPrevious.eq(route.amountInBN), "Wrong input distribution")
 
   route.legs.forEach(l => {
-    // 3.1 Transfer tokens from the routeProcessor contract to the pool if it is necessary
+    // 2.1 Transfer tokens from the routeProcessor contract to the pool if it is necessary
     const neibourLegs = tokenOutputLegs.get(l.tokenFrom.tokenId as string) as RouteLeg[]
     if (neibourLegs.length > 1 && l.tokenFrom != route.fromToken) {
       res += codeSendERC20(route.fromToken, l.poolAddress, l.swapPortion)
     }
 
-    // 3.2 Make swap
+    // 2.2 Make swap
     const outLegs = tokenOutputLegs.get(l.tokenTo.tokenId as string)
     let outAddress
     if (outLegs == undefined) {
@@ -54,9 +53,6 @@ export function getRouteProcessorCode(
     res += codeSwap(l, outAddress, reg)
   })
 
-  // 4. TODO: check minoutput
-  res += codeCheckBalance(route.toToken, toAddress, 0, minLiquidity)
-
   return res;
 }
 
@@ -64,13 +60,13 @@ function getTokenOutputLegs(route: MultiRoute): Map<string, RouteLeg[]> {
   const res = new Map<string, RouteLeg[]>()
 
   route.legs.forEach(l => {
-    const chainId = l.tokenFrom.chainId?.toString()
-    if (chainId === undefined) {
-      assert(0)
+    const tokenId = l.tokenFrom.tokenId?.toString()
+    if (tokenId === undefined) {
+      assert(0, "Unseted tokenId")
     } else {
-      const legsOutput = res.get(chainId) || []
+      const legsOutput = res.get(tokenId) || []
       legsOutput.push(l)
-      res.set(chainId, legsOutput)
+      res.set(tokenId, legsOutput)
     }
   })
 
@@ -79,38 +75,16 @@ function getTokenOutputLegs(route: MultiRoute): Map<string, RouteLeg[]> {
 
 // Transfers tokens from msg.sender to a pool
 function codeTransferERC20(token: RToken, poolAddress: string, amount: BigNumber): string {
-  const code = ethers.utils.defaultAbiCoder.encode(
-    ["uint8", "address", "address", "uint"], 
-    [3, token.address, poolAddress, amount]
-  );
-  assert(code.length == 73)
+  const code = new HEXer().uint8(1).address(poolAddress).uint(amount).toString()
+  assert(code.length == 53*2, "codeTransferERC20 unexpected code length")
   return code
 }
 
 // Sends tokens from the RouteProcessor to a pool
 function codeSendERC20(token: RToken, poolAddress: string, share: number): string {
-  const code = ethers.utils.defaultAbiCoder.encode(
-    ["uint8", "address", "address", "uint"], 
-    [2, token.address, poolAddress, Math.round(share*65535)]
-  );
-  assert(code.length == 43)
-  return code
-}
-
-function codeRememberBalance(token: RToken, address: string, slot: number): string {
-  const code = ethers.utils.defaultAbiCoder.encode(
-    ["uint8", "address", "address", "uint8"], 
-    [22, token.address, address, slot]
-  );
-  assert(code.length == 42)
-  return code
-}
-function codeCheckBalance(token: RToken, address: string, slot: number, minLiquidity: BigNumber): string {
-  const code = ethers.utils.defaultAbiCoder.encode(
-    ["uint8", "address", "address", "uint8", "uint"], 
-    [23, token.address, address, slot, minLiquidity]
-  );
-  assert(code.length == 74)
+  const code = new HEXer().uint8(2).address(token.address)
+    .address(poolAddress).uint16(Math.round(share*65535)).toString()
+  assert(code.length == 43*2, "codeSendERC20 unexpected code length")
   return code
 }
 

@@ -25,9 +25,9 @@ export class Swapper {
     return route
   }
 
-  getRouterProcessorCode(route: MultiRoute, to: string, slippageTolerance = 0.005): string {
-    const amountOutMin = route.amountInBN.mul(getBigNumber((1 - slippageTolerance)*1_000_000)).div(1_000_000)
-    const code = getRouteProcessorCode(route, this.routeProcessor, to, amountOutMin, this.poolRegistarator)
+  getRouterProcessorCode(route: MultiRoute, to: string): string {
+    //const amountOutMin = route.amountInBN.mul(getBigNumber((1 - slippageTolerance)*1_000_000)).div(1_000_000)
+    const code = getRouteProcessorCode(route, this.routeProcessor, to, this.poolRegistarator)
     return code
   }
 

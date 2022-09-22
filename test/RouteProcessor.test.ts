@@ -7,6 +7,8 @@ import { getBigNumber, RouteStatus } from "@sushiswap/tines";
 
 describe("RouteProcessor", async function () {
   it("Deploy check", async function () {
+    const [Alice] = await ethers.getSigners()
+
     const RouteProcessor: RouteProcessor__factory = await ethers.getContractFactory(
       "RouteProcessor2"
     );
@@ -15,11 +17,12 @@ describe("RouteProcessor", async function () {
     await routeProcessor.deployed();
 
     const provider = new ethers.providers.AlchemyProvider("homestead", process.env.ALCHEMY_API_KEY)
-debugger
+    
     const swapper = new Swapper(routeProcessor.address, provider)
     const route = await swapper.getRoute(ETHEREUM.SUSHI, getBigNumber(100e18), ETHEREUM.FEI)
+    const code = swapper.getRouterProcessorCode(route, Alice.address)
 
-    expect(route.status).equals(RouteStatus.Success)
+    expect(code).not.equals('')
     // expect(await routeProcessor.greet()).to.equal("Hello, world!");
 
     // await routeProcessor.setGreeting("Hola, mundo!");
