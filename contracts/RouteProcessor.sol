@@ -3,54 +3,50 @@
 pragma solidity 0.8.11;
 
 import "../interfaces/IERC20.sol";
-
-uint constant BALANCE_NUM = 20;
+import "../interfaces/IUniswapV2Pair.sol";
 
 contract RouteProcessor {
 
   // To be used in UI. For External Owner Account only
-  function processRouteEOA(bytes calldata route) external payable {
+  function processRouteEOA(
+    address tokenIn,
+    uint amountIn,
+    address tokenOut,
+    uint amountOutMin,
+    address to,
+    bytes calldata route
+  ) external payable  returns (uint amountOut){
     require(tx.origin == msg.sender, "Call from not EOA");      // Prevents reentrance
 
-    uint position = 0;  // current reading position in route
-    uint[BALANCE_NUM] memory balances; // Array of remembered initial balances - for amountOunMin checking
+    uint amountInAcc = 0;
+    uint balanceInitial = IERC20(tokenOut).balanceOf(to);
 
+    uint position = 0;  // current reading position in route
     while(position < route.length) {
       uint8 commandCode = uint8(route[position]);
-      if        (commandCode == 1) { // send ETH from this contract to an address
-        position = sendETHShare(route, position + 1);
+      if        (commandCode == 1) { // transfer ERC20 tokens from msg.sender to an address
+        uint transferAmount;
+        (transferAmount, position) = transferERC20Amount(tokenIn, route, position + 1);
+        amountInAcc += transferAmount;
       } else if (commandCode == 2) { // send ERC20 tokens from this router to an address
         position = sendERC20Share(route, position + 1);
-      } else if (commandCode == 3) { // transfer ERC20 tokens from msg.sender to an address
-        position = transferERC20(route, position + 1);
 
       } else if (commandCode == 10) { // call a function of a contract - pool.swap for example
         position = contractCall(route, position + 1);
       } else if (commandCode == 11) { // call a function of a contract with {value: x, gas: y}
         position = contractCallValueGas(route, position + 1);
 
-      } else if (commandCode == 20) { // checks self ETH balance - for amountOutMin checks
-        position = checkSelfBalanceETH(route, position + 1);
-      } else if (commandCode == 21) { // checks self ERC20 balance - for amountOutMin checks
-        position = checkSelfBalanceERC20(route, position + 1);
-      } else if (commandCode == 22) { // remembers initial ERC20 balance of an address - for amountOutMin checks
-        position = getBalanceERC20(route, position + 1, balances);
-      } else if (commandCode == 23) { // checks an address ERC20 balance increasing - for amountOutMin checks
-        position = checkBalanceERC20(route, position + 1, balances);
+      } else if (commandCode == 20) { // Sushi/Uniswap pool swap
+        (, position) = swapUniswapPool(route, position + 1);
+
       } else revert("Unknown command code");
     }
-  }
 
-  // Send ETH from this contract to an address
-  function sendETHShare(bytes calldata route, uint position) private returns (uint) {
-    (address payable to, uint16 share) = abi.decode(route[position:], (address, uint16));    
+    require(amountInAcc == amountIn, "Wrong amountIn value");
+    uint balanceFinal = IERC20(tokenOut).balanceOf(to);
+    require(balanceFinal >= balanceInitial + amountOutMin, "Minimal ouput balance violation");
 
-    uint amount; unchecked {
-      amount = address(this).balance * share/65535;
-    }
-    to.transfer(amount);
-
-    return position + 22;
+    amountOut = balanceFinal - balanceInitial;
   }
 
   // Send ERC20 tokens from this router to an address. Quantity for sending is determined by share in 1/65535.
@@ -67,16 +63,14 @@ contract RouteProcessor {
     return position + 42;
   }
 
-  // Transfers ERC20 tokens from an address to an address. Tokens should be approved
+  // Transfers input tokens from msg.sender to an address. Tokens should be approved
   // Expected to be launched for initial liquidity distribution fro user to pools, so we know exact amounts
-  function transferERC20(bytes calldata route, uint position) private returns (uint) {
-    (address token, address to, uint amount) = abi.decode(
-      route[position:], 
-      (address, address, uint)
-    );
-    IERC20(token).transferFrom(msg.sender, to, amount);
-    
-    return position + 72;
+  function transferERC20Amount(address token, bytes calldata route, uint position) 
+    private returns (uint amount, uint positionNew) {
+    address to;
+    (to, amount) = abi.decode(route[position:], (address, uint));
+    IERC20(token).transferFrom(msg.sender, to, amount);    
+    positionNew =  position + 52;
   }
 
   // Calls a function of a contract. Expected to be called for pool.swap functions
@@ -121,51 +115,24 @@ contract RouteProcessor {
     return position + callDataSize;
   }
 
-  // Checks self ETH balance - for amountOutMin checks
-  function checkSelfBalanceETH(bytes calldata route, uint position) private view returns (uint) {
-    (uint amountMin) = abi.decode(route[position:], (uint));
-    require(address(this).balance >= amountMin, "Insufficient ETH liquidity");
-
-    return position + 32;
-  }
-
-  // Checks self ERC20 balance - for amountOutMin checks
-  function checkSelfBalanceERC20(bytes calldata route, uint position) private  view returns (uint) {
-    (address token, uint amountMin) = abi.decode(route[position:], (address, uint));
-    require(IERC20(token).balanceOf(address(this)) >= amountMin, "Insufficient liquidity");
-
-    return position + 52;
-  }
-
-  // Remembers initial ERC20 balance of an address - for amountOutMin checks
-  // Supposed to be called before routing
-  function getBalanceERC20(
-    bytes calldata route, 
-    uint position, 
-    uint[BALANCE_NUM] memory balances
-  ) private view returns (uint) {
-    (address token, address host, uint8 n) = abi.decode(route[position:], (address, address, uint8));
-    require(n < BALANCE_NUM, "Wrong balance number");
-    balances[n] = IERC20(token).balanceOf(address(host));
-    return position + 41;
-  }
-
-  // Checks an address ERC20 balance increasing. Supposed to be called after routing
-  function checkBalanceERC20(
-    bytes calldata route, 
-    uint position, 
-    uint[BALANCE_NUM] memory balances
-  ) private view returns (uint) {
-    (address token, address host, uint8 n, uint amountMin) = abi.decode(
-      route[position:], 
-      (address, address, uint8, uint)
+  // Sushi/Uniswap pool swap
+  function swapUniswapPool(bytes calldata data, uint position) 
+    private returns (uint amountOut, uint positionNew) {
+    (address pool, address tokenIn, bool direction, address to) = abi.decode(
+      data[position:], 
+      (address, address, bool, address)
     );
-    require(n < BALANCE_NUM, "Wrong balance number");
+    positionNew = position + 61;
 
-    uint currentBalance = IERC20(token).balanceOf(address(host));
-    require(balances[n] + amountMin <= currentBalance, "Insufficient liquidity");
+    (uint r0, uint r1,) = IUniswapV2Pair(pool).getReserves();
+    require(r0 > 0 && r1 > 0, 'Wrong pool reserves');
+    (uint reserveIn, uint reserveOut) = direction ? (r0, r1) : (r1, r0);
 
-    return position + 73;
+    uint amountIn = IERC20(tokenIn).balanceOf(pool) - reserveIn;
+    uint amountInWithFee = amountIn * 997;
+    amountOut = amountInWithFee * reserveOut / (reserveIn * 1000 + amountInWithFee);
+    (uint amount0Out, uint amount1Out) = direction ? (uint(0), amountOut) : (amountOut, uint(0));
+    IUniswapV2Pair(pool).swap(amount0Out, amount1Out, to, new bytes(0));
   }
 
 }

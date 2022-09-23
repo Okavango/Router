@@ -11,33 +11,28 @@ describe("RouteProcessor", async function () {
     const provider = new ethers.providers.AlchemyProvider("homestead", process.env.ALCHEMY_API_KEY)
 
     const [Alice] = await ethers.getSigners()
-    const WETH9 = await new ethers.Contract(ETHEREUM.WETH9.address, WETH9ABI, provider)
-    //const txGetWETH = await WETH9.connect(Alice).deposit({value: getBigNumber(1e18)})
-    const res = await Alice.sendTransaction({
+    await Alice.sendTransaction({ // make Alice have 10 WETH9
       to: ETHEREUM.WETH9.address,
-      value: getBigNumber(1e18)
+      value: getBigNumber(10e18)
     })
+    //const WETH9 = await new ethers.Contract(ETHEREUM.WETH9.address, WETH9ABI, Alice)
+    //const txGetWETH = await WETH9.connect(Alice).deposit({value: getBigNumber(1e18)})
     //await Alice.populateTransaction(WETH9, "deposit()", [])
     //console.log(res)
-    const balanceAfter = parseInt((await WETH9.balanceOf(Alice.address)).toString())
-    expect(balanceAfter).gt(0)   
+    // const balanceAfter = parseInt((await WETH9.balanceOf(Alice.address)).toString())
+    // console.log(balanceAfter); 
 
     const RouteProcessor: RouteProcessor__factory = await ethers.getContractFactory(
-      "RouteProcessor2"
+      "RouteProcessor"
     );
     const routeProcessor = await RouteProcessor.deploy();
 
     await routeProcessor.deployed();
-
     
     const swapper = new Swapper(routeProcessor.address, provider)
-    const route = await swapper.getRoute(ETHEREUM.SUSHI, getBigNumber(100e18), ETHEREUM.FEI)
+    const route = await swapper.getRoute(ETHEREUM.WETH9, getBigNumber(10e18), ETHEREUM.FEI)
     const code = swapper.getRouterProcessorCode(route, Alice.address)
 
     expect(code).not.equals('')
-    // expect(await routeProcessor.greet()).to.equal("Hello, world!");
-
-    // await routeProcessor.setGreeting("Hola, mundo!");
-    // expect(await routeProcessor.greet()).to.equal("Hola, mundo!");
   });
 });

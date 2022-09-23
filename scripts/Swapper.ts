@@ -5,7 +5,7 @@ import { PoolRegistarator } from "./liquidityProviders/LiquidityProvider";
 import { SushiProvider } from "./liquidityProviders/Sushi";
 import * as ETHEREUM from './liquidityProviders/EthereumTokens'
 import { getRouteProcessorCode } from "./TinesToRouter";
-import * as RouteProcessorABI from "../artifacts/contracts/RouteProcessor2.sol/RouteProcessor2.json"
+import * as RouteProcessorABI from "../artifacts/contracts/RouteProcessor.sol/RouteProcessor.json"
 
 export class Swapper {
   poolRegistarator: PoolRegistarator
@@ -32,6 +32,6 @@ export class Swapper {
   }
 
   // async callRouter(code: string) {
-  //   const routeProcessor = new Contract(this.routeProcessor, RouteProcessorABI, "RouteProcessor2")
+  //   const routeProcessor = new Contract(this.routeProcessor, RouteProcessorABI, "RouteProcessor")
   // }
 }
