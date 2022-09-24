@@ -39,9 +39,9 @@ export class HEXer {
   }
 
   uint256(data: BigNumber): HEXer {
-    const hex = data.toString().padStart(64, '0')
+    const hex = data.toHexString().slice(2).padStart(64, '0')
     if (data.lt(0) || hex.length > 64) {
-      throw new Error("Wrong uin256: " + data.toString)
+      throw new Error("Wrong uin256: " + data.toString())
     }
     this.hex += hex
 
