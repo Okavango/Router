@@ -4,7 +4,7 @@ import { Token } from "./liquidityProviders/EthereumTokens";
 import { PoolRegistarator } from "./liquidityProviders/LiquidityProvider";
 import { SushiProvider } from "./liquidityProviders/Sushi";
 import * as ETHEREUM from './liquidityProviders/EthereumTokens'
-import { getRouteProcessorCode } from "./TinesToRouter";
+import { getRouteProcessorCode } from "./TinesToRouteProcessor";
 import * as RouteProcessorABI from "../artifacts/contracts/RouteProcessor.sol/RouteProcessor.json"
 import { UniswapProvider } from "./liquidityProviders/Uniswap";
 
@@ -30,7 +30,7 @@ export class Swapper {
     return [route, pools.length]
   }
 
-  getRouterProcessorCode(route: MultiRoute, to: string): string {
+  getRouteProcessorCode(route: MultiRoute, to: string): string {
     //const amountOutMin = route.amountInBN.mul(getBigNumber((1 - slippageTolerance)*1_000_000)).div(1_000_000)
     const code = getRouteProcessorCode(route, this.routeProcessor, to, this.poolRegistarator)
     return code
@@ -39,7 +39,7 @@ export class Swapper {
   getPoolsProviderName(poolAddress: string): string {
     return this.poolRegistarator.getProvider(poolAddress)?.getProviderName() as string
   }
-  // async callRouter(code: string) {
+  // async callRouteProcessor(code: string) {
   //   const routeProcessor = new Contract(this.routeProcessor, RouteProcessorABI, "RouteProcessor")
   // }
 }

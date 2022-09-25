@@ -7,9 +7,9 @@ import { getBigNumber } from "@sushiswap/tines";
 import { WETH9ABI } from "../ABI/WETH9";
 
 describe("RouteProcessor", async function () {
-  it("Router WETH => FEI check", async function () {
+  it("RouteProcessor WETH => FEI check", async function () {
 
-    console.log("1. RouterProcessor deployment ...");    
+    console.log("1. RouteProcessor deployment ...");    
     const RouteProcessor: RouteProcessor__factory = await ethers.getContractFactory(
       "RouteProcessor"
     );
@@ -26,7 +26,7 @@ describe("RouteProcessor", async function () {
       value: amountIn
     })
     
-    console.log("4. Approve user's WETH to the router processor ...");    
+    console.log("4. Approve user's WETH to the route processor ...");    
     const WETH9 = await new ethers.Contract(ETHEREUM.WETH9.address, WETH9ABI, Alice)
     await WETH9.connect(Alice).approve(routeProcessor.address, amountIn)
 
@@ -45,10 +45,10 @@ describe("RouteProcessor", async function () {
     })
     console.log(`    Output: ${route.amountOutBN} ${route.toToken.name}`);
 
-    console.log('7. Create router code ...');    
-    const code = swapper.getRouterProcessorCode(route, Alice.address)
+    console.log('7. Create route processor code ...');    
+    const code = swapper.getRouteProcessorCode(route, Alice.address)
 
-    console.log('8. Call router ...');    
+    console.log('8. Call route processor ...');    
     const amountOutMin = route.amountInBN.mul(getBigNumber((1 - 0.005)*1_000_000)).div(1_000_000)
     const tx = await routeProcessor.processRouteEOA(
       ETHEREUM.WETH9.address, 
