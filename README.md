@@ -1,11 +1,9 @@
-# HardHat Foundation
+# Universal RouterProcessor Proof of Concept
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-## Env
+## install
 
 ```sh
-cp .env.example .env
+yarn
 ```
 
 ## Test
@@ -14,76 +12,34 @@ cp .env.example .env
 yarn test
 ```
 
-```sh
-yarn test test/Greeter.ts
-```
-
-## Coverage
+## Test Result Example:
 
 ```sh
-yarn test:coverage
-```
-
-<https://hardhat.org/plugins/solidity-coverage.html#tasks>
-
-## Gas
-
-```sh
-yarn test:gas
-```
-
-<https://github.com/cgewecke/hardhat-gas-reporter>
-
-## Lint
-
-```sh
-yarn lint
-```
-
-## Watch
-
-```sh
-npx hardhat watch compile
-```
-
-## Deployment
-
-### Local
-
-Running the following command will start a local node and run the defined deploy script on the local node.
-
-```sh
-npx hardhat node
-```
-
-### Mainnet
-
-```sh
-yarn mainnet:deploy
-```
-
-```sh
-yarn mainnet:verify
-```
-
-```sh
-hardhat tenderly:verify --network mainnet ContractName=Address
-```
-
-```sh
-hardhat tenderly:push --network mainnet ContractName=Address
-```
-
-### Ropsten
-
-```sh
-yarn ropsten:deploy
-```
-
-```sh
-yarn ropsten:verify
-```
-
-```sh
-hardhat tenderly:verify --network ropsten ContractName=Address
+  RouteProcessor
+1. RouterProcessor deployment ...
+2. User creation ...
+3. Deposit user's 10ETH to WETH9
+4. Approve user's WETH to the router processor ...
+5. Fetch Sushiswap and Uniswap pools' data ...
+    54 pools were found
+6. Create Route ...
+    Input: 10000000000000000000 Wrapped Ether
+    Wrapped Ether 20% Sushiswap -> USD Coin
+    Wrapped Ether 6% Sushiswap -> FRAX
+    Wrapped Ether 4% Sushiswap -> SushiToken
+    Wrapped Ether 68% UniswapV2 -> Fei USD
+    Wrapped Ether 2% UniswapV2 -> DPI
+    DPI 100% Sushiswap -> Fei USD
+    SushiToken 100% Sushiswap -> FRAX
+    FRAX 100% UniswapV2 -> Fei USD
+    USD Coin 100% UniswapV2 -> Fei USD
+    Output: 4605120249550685077504 Fei USD
+7. Create router code ...
+8. Call router ...
+9. Fetching user's output balance ...
+    expected amountOut: 4605120249550685077504
+    real amountOut:     4605120249502987925860
+    slippage: 0%
+    gas use: 593233
+    √ Router WETH => FEI check (253808ms)
 ```

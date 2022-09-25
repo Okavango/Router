@@ -9,7 +9,7 @@ import { WETH9ABI } from "../ABI/WETH9";
 describe("RouteProcessor", async function () {
   it("Router WETH => FEI check", async function () {
 
-    console.log("1. Router deployment ...");    
+    console.log("1. RouterProcessor deployment ...");    
     const RouteProcessor: RouteProcessor__factory = await ethers.getContractFactory(
       "RouteProcessor"
     );
@@ -26,7 +26,7 @@ describe("RouteProcessor", async function () {
       value: amountIn
     })
     
-    console.log("4. Approve user's WETH to the router ...");    
+    console.log("4. Approve user's WETH to the router processor ...");    
     const WETH9 = await new ethers.Contract(ETHEREUM.WETH9.address, WETH9ABI, Alice)
     await WETH9.connect(Alice).approve(routeProcessor.address, amountIn)
 
