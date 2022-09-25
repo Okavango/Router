@@ -6,6 +6,7 @@ import { SushiProvider } from "./liquidityProviders/Sushi";
 import * as ETHEREUM from './liquidityProviders/EthereumTokens'
 import { getRouteProcessorCode } from "./TinesToRouter";
 import * as RouteProcessorABI from "../artifacts/contracts/RouteProcessor.sol/RouteProcessor.json"
+import { UniswapProvider } from "./liquidityProviders/Uniswap";
 
 export class Swapper {
   poolRegistarator: PoolRegistarator
@@ -18,11 +19,15 @@ export class Swapper {
     this.chainDataProvider = chainDataProvider
   }
 
-  async getRoute(tokenIn: Token, amountIn: BigNumber, tokenOut: Token): Promise<MultiRoute> {
+  async getRoute(tokenIn: Token, amountIn: BigNumber, tokenOut: Token): Promise<[MultiRoute, number]> {
     const sushiProvider: SushiProvider = new SushiProvider(this.poolRegistarator, this.chainDataProvider)
-    const pools = await sushiProvider.getPools(tokenIn, tokenOut)
+    const uniProvider: UniswapProvider = new UniswapProvider(this.poolRegistarator, this.chainDataProvider)
+    const poolsSu = sushiProvider.getPools(tokenIn, tokenOut)
+    const poolsUni = uniProvider.getPools(tokenIn, tokenOut)
+    const poolsPre = await Promise.all([poolsSu, poolsUni])
+    const pools = [...poolsPre[0], ...poolsPre[1]]
     const route = findMultiRouteExactIn(tokenIn, tokenOut, amountIn, pools, ETHEREUM.WETH9,  50e9)
-    return route
+    return [route, pools.length]
   }
 
   getRouterProcessorCode(route: MultiRoute, to: string): string {
@@ -31,6 +36,9 @@ export class Swapper {
     return code
   }
 
+  getPoolsProviderName(poolAddress: string): string {
+    return this.poolRegistarator.getProvider(poolAddress)?.getProviderName() as string
+  }
   // async callRouter(code: string) {
   //   const routeProcessor = new Contract(this.routeProcessor, RouteProcessorABI, "RouteProcessor")
   // }

@@ -24,6 +24,7 @@ export abstract class LiquidityProvider {
     }
 
     // abstract updateData(): void;
+    abstract getProviderName(): string;
     abstract getPools(t0: Token, t1: Token): Promise<RPool[]>;
     abstract getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string): string;
 }

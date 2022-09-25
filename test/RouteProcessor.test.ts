@@ -30,15 +30,20 @@ describe("RouteProcessor", async function () {
     const WETH9 = await new ethers.Contract(ETHEREUM.WETH9.address, WETH9ABI, Alice)
     await WETH9.connect(Alice).approve(routeProcessor.address, amountIn)
 
-    console.log("5. Fetch Sushiswap pools' data ...");    
+    console.log("5. Fetch Sushiswap and Uniswap pools' data ...");    
     const provider = new ethers.providers.AlchemyProvider("homestead", process.env.ALCHEMY_API_KEY)
     const swapper = new Swapper(routeProcessor.address, provider)
-    const route = await swapper.getRoute(ETHEREUM.WETH9, amountIn, ETHEREUM.FEI)
+    const [route, poolsNumber] = await swapper.getRoute(ETHEREUM.WETH9, amountIn, ETHEREUM.FEI)
+    console.log(`    ${poolsNumber} pools were found`)
 
     console.log("6. Create Route ...")
+    console.log(`    Input: ${route.amountInBN} ${route.fromToken.name}`);    
     route.legs.forEach(l => {
-      console.log(`    ${l.tokenFrom.name} ${Math.round(l.absolutePortion*100)}% -> ${l.tokenTo.name}`);
+      console.log(
+        `    ${l.tokenFrom.name} ${Math.round(l.absolutePortion*100)}%`
+        + ` ${swapper.getPoolsProviderName(l.poolAddress)} -> ${l.tokenTo.name}`);
     })
+    console.log(`    Output: ${route.amountOutBN} ${route.toToken.name}`);
 
     console.log('7. Create router code ...');    
     const code = swapper.getRouterProcessorCode(route, Alice.address)

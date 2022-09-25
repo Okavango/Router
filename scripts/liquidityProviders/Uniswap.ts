@@ -83,9 +83,9 @@ function getAllRouteTokens(t1: Token, t2: Token) {
 export function getPoolAddress(t1: Token, t2: Token): string {
   const [token0, token1] = t1.address.toLowerCase() < t2.address.toLowerCase() ? [t1, t2] : [t2, t1]
   return getCreate2Address(
-    '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac', // factoryAddress,
+    '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f', // univ2 factoryAddress,
     keccak256(['bytes'], [pack(['address', 'address'], [token0.address, token1.address])]),
-    '0xe18a34eb0e04b04f7a0ac29a6e80748dca96319b42c54d679cb821dca90c6303' //INIT_CODE_HASH[token0.chainId]
+    '0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f' //INIT_CODE_HASH[token0.chainId]
   )
 }
 
@@ -113,7 +113,7 @@ async function getAllPools(tokens: Token[], chainDataProvider: ethers.providers.
   return pools.filter(p => p !== undefined) as RPool[]
 }
 
-export class SushiProvider extends LiquidityProvider {
+export class UniswapProvider extends LiquidityProvider {
   pools: Map<string, RPool>
   chainDataProvider: ethers.providers.BaseProvider
 
@@ -123,7 +123,7 @@ export class SushiProvider extends LiquidityProvider {
     this.chainDataProvider = chainDataProvider
   }
 
-  getProviderName(): string {return 'Sushiswap'}
+  getProviderName(): string {return 'UniswapV2'}
 
   async getPools(t0: Token, t1: Token): Promise<RPool[]> {
     const tokens = getAllRouteTokens(t0, t1)
