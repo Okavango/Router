@@ -18,6 +18,8 @@ export class Token {
 export interface Network {
   chainId: number,
   tokens: {[name: string]: Token},
+  baseWrappedToken: Token,
+  baseTokenSymbol: string,
   BASES_TO_CHECK_TRADES_AGAINST: Token[],
   ADDITIONAL_BASES: {[tokenAddress: string]: Token[]}
 }

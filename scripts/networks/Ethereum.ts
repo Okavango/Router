@@ -4,6 +4,8 @@ import { Network } from './Network'
 export const ETHEREUM: Network = {
   chainId: 1,
   tokens: EthereumTokens,
+  baseWrappedToken: EthereumTokens.WETH9,
+  baseTokenSymbol: 'ETH',
   BASES_TO_CHECK_TRADES_AGAINST: [
     EthereumTokens.WETH9,
     EthereumTokens.DAI,
