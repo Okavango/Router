@@ -1,9 +1,9 @@
 import { findMultiRouteExactIn, getBigNumber, MultiRoute } from "@sushiswap/tines";
 import { BigNumber, Contract, ethers } from "ethers";
-import { Token } from "./liquidityProviders/EthereumTokens";
+import { Token } from "./networks/Network";
 import { PoolRegistarator } from "./liquidityProviders/LiquidityProvider";
 import { SushiProvider } from "./liquidityProviders/Sushi";
-import * as ETHEREUM from './liquidityProviders/EthereumTokens'
+import {ETHEREUM} from './networks/Ethereum'
 import { getRouteProcessorCode } from "./TinesToRouteProcessor";
 import * as RouteProcessorABI from "../artifacts/contracts/RouteProcessor.sol/RouteProcessor.json"
 import { UniswapProvider } from "./liquidityProviders/Uniswap";
@@ -26,7 +26,7 @@ export class Swapper {
     const poolsUni = uniProvider.getPools(tokenIn, tokenOut)
     const poolsPre = await Promise.all([poolsSu, poolsUni])
     const pools = [...poolsPre[0], ...poolsPre[1]]
-    const route = findMultiRouteExactIn(tokenIn, tokenOut, amountIn, pools, ETHEREUM.WETH9,  50e9)
+    const route = findMultiRouteExactIn(tokenIn, tokenOut, amountIn, pools, ETHEREUM.tokens.WETH9,  50e9)
     return [route, pools.length]
   }
 

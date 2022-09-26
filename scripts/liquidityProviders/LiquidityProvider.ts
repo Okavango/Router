@@ -1,5 +1,5 @@
 import { RouteLeg, RPool } from "@sushiswap/tines"
-import { Token } from "./EthereumTokens"
+import { Token } from "../networks/Network"
 
 export class PoolRegistarator {
     pools: Map<string, LiquidityProvider>
