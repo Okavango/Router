@@ -1,8 +1,9 @@
 import {EthereumTokens} from './EthereumTokens'
-import { Network } from './Network'
+import { ChainId, Network } from './Network'
 
 export const ETHEREUM: Network = {
-  chainId: 1,
+  name: 'ETHEREUM',
+  chainId: ChainId.ETHEREUM,
   tokens: EthereumTokens,
   baseWrappedToken: EthereumTokens.WETH9,
   baseTokenSymbol: 'ETH',

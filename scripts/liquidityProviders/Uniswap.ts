@@ -5,14 +5,14 @@ import { getCreate2Address } from "ethers/lib/utils";
 import { keccak256, pack } from '@ethersproject/solidity'
 import { SushiPoolABI } from "../../ABI/SushiPool";
 import { HEXer } from "../HEXer";
-import { Token, Network } from "../networks/Network";
+import { Token, Network, ChainId } from "../networks/Network";
 
 const UNISWAP_V2_FACTORY = {
-  1: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'
+  [ChainId.ETHEREUM]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'
 }
 
 const INIT_CODE_HASH = {
-  1: '0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f'
+  [ChainId.ETHEREUM]: '0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f'
 }
 
 function getAllRouteTokens(net: Network, t1: Token, t2: Token) {
@@ -74,6 +74,10 @@ export class UniswapProvider extends LiquidityProvider {
   getProviderName(): string {return 'UniswapV2'}
 
   async getPools(t0: Token, t1: Token): Promise<RPool[]> {
+    if (UNISWAP_V2_FACTORY[this.network.chainId] === undefined) {
+      // No uniswap for this network
+      return []
+    }
     const tokens = getAllRouteTokens(this.network, t0, t1)
     const pools = await getAllPools(this.network, tokens, this.chainDataProvider)
     this.registrator.addPools(pools.map(p => p.address), this)

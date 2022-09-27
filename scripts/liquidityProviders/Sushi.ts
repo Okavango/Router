@@ -5,14 +5,16 @@ import { getCreate2Address } from "ethers/lib/utils";
 import { keccak256, pack } from '@ethersproject/solidity'
 import { SushiPoolABI } from "../../ABI/SushiPool";
 import { HEXer } from "../HEXer";
-import { Network, Token } from "../networks/Network";
+import { ChainId, Network, Token } from "../networks/Network";
 
 const SUSHISWAP_FACTORY = {
-  1: '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac'
+  [ChainId.ETHEREUM]: '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac',
+  [ChainId.MATIC]: '0xc35DADB65012eC5796536bD9864eD8773aBc74C4',
 }
 
 const INIT_CODE_HASH = {
-  1: '0xe18a34eb0e04b04f7a0ac29a6e80748dca96319b42c54d679cb821dca90c6303'
+  [ChainId.ETHEREUM]: '0xe18a34eb0e04b04f7a0ac29a6e80748dca96319b42c54d679cb821dca90c6303',
+  [ChainId.MATIC]:    '0xe18a34eb0e04b04f7a0ac29a6e80748dca96319b42c54d679cb821dca90c6303',
 }
 
 function getAllRouteTokens(net: Network,  t1: Token, t2: Token) {
@@ -74,6 +76,10 @@ export class SushiProvider extends LiquidityProvider {
   getProviderName(): string {return 'Sushiswap'}
 
   async getPools(t0: Token, t1: Token): Promise<RPool[]> {
+    if (SUSHISWAP_FACTORY[this.network.chainId] === undefined) {
+      // No sushiswap for this network
+      return []
+    }
     const tokens = getAllRouteTokens(this.network, t0, t1)
     const pools = await getAllPools(this.network, tokens, this.chainDataProvider)
     this.registrator.addPools(pools.map(p => p.address), this)

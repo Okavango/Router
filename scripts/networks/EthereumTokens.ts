@@ -1,8 +1,4 @@
-import { Token } from "./Network";
-
-enum ChainId {
-  ETHEREUM = 1,
-}
+import { ChainId, Token } from "./Network";
 
 export const EthereumTokens: {[name: string]: Token} = {
   WETH9: new Token(

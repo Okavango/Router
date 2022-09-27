@@ -1,4 +1,10 @@
 
+
+export enum ChainId {
+  ETHEREUM = 1,
+  MATIC = 137,
+}
+
 export class Token {
   name: string;
   decimals: number;
@@ -16,7 +22,8 @@ export class Token {
 }
 
 export interface Network {
-  chainId: number,
+  name: string,
+  chainId: ChainId,
   tokens: {[name: string]: Token},
   baseWrappedToken: Token,
   baseTokenSymbol: string,
