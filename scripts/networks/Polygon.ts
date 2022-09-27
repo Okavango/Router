@@ -146,6 +146,7 @@ const tokens: { [name: string]: Token } = {
 export const POLYGON: Network = {
   name: 'POLYGON',
   chainId: ChainId.MATIC,
+  alchemyProviderArgs: ["matic", process.env.ALCHEMY_POLYGON_API_KEY],
   tokens,
   baseWrappedToken: tokens.WMATIC,
   baseTokenSymbol: "MATIC",

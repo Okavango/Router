@@ -1,4 +1,4 @@
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import { expect } from "chai";
 import { RouteProcessor__factory } from "../types";
 import { Swapper } from "../scripts/Swapper";
@@ -6,6 +6,8 @@ import {ETHEREUM} from '../scripts/networks/Ethereum'
 import { getBigNumber } from "@sushiswap/tines";
 import { WETH9ABI } from "../ABI/WETH9";
 import { Network, Token } from "../scripts/networks/Network";
+import { POLYGON } from "../scripts/networks/Polygon";
+import { HardhatNetworkConfig } from "hardhat/types";
 
 
 // Swaps amountIn basewrappedToken(WETH, ...) to toToken
@@ -31,8 +33,8 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
   const WrappedBaseTokenContract = await new ethers.Contract(net.baseWrappedToken.address, WETH9ABI, Alice)
   await WrappedBaseTokenContract.connect(Alice).approve(routeProcessor.address, amountInBN)
 
-  console.log("5. Fetch Sushiswap and Uniswap pools' data ...");    
-  const provider = new ethers.providers.AlchemyProvider("homestead", process.env.ALCHEMY_API_KEY)
+  console.log("5. Fetch pools' data ...");    
+  const provider = new ethers.providers.AlchemyProvider(...net.alchemyProviderArgs)
   const swapper = new Swapper(routeProcessor.address, provider, net)
   const route = await swapper.getRoute(net.baseWrappedToken, amountInBN, toToken)
   Object.keys(swapper.poolsNumber).forEach(provider => {
@@ -75,7 +77,16 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
 
 describe("RouteProcessor", async function () {
   it("Ethereum WETH => FEI check", async function () {
+    const forking_url = (network.config as HardhatNetworkConfig)?.forking?.url;
+    if (forking_url !== undefined && forking_url.search('eth-mainnet') >= 0) {
+      await testRouteProcessor(ETHEREUM, 10, ETHEREUM.tokens.FEI)
+    }
+  })
 
-    await testRouteProcessor(ETHEREUM, 10, ETHEREUM.tokens.FEI)
+  it("Polygon WMATIC => FEI check", async function () {
+    const forking_url = (network.config as HardhatNetworkConfig)?.forking?.url;
+    if (forking_url !== undefined && forking_url.search('polygon') >= 0) {
+      await testRouteProcessor(POLYGON, 9000, POLYGON.tokens.SUSHI)
+    }
   })
 });

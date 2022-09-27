@@ -24,6 +24,7 @@ export class Token {
 export interface Network {
   name: string,
   chainId: ChainId,
+  alchemyProviderArgs: Array<string | undefined>,
   tokens: {[name: string]: Token},
   baseWrappedToken: Token,
   baseTokenSymbol: string,

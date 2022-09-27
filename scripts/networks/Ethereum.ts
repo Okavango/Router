@@ -4,6 +4,7 @@ import { ChainId, Network } from './Network'
 export const ETHEREUM: Network = {
   name: 'ETHEREUM',
   chainId: ChainId.ETHEREUM,
+  alchemyProviderArgs: ["homestead", process.env.ALCHEMY_API_KEY],
   tokens: EthereumTokens,
   baseWrappedToken: EthereumTokens.WETH9,
   baseTokenSymbol: 'ETH',
