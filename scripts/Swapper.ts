@@ -6,6 +6,7 @@ import { SushiProvider } from "./liquidityProviders/Sushi";
 import { getRouteProcessorCode } from "./TinesToRouteProcessor";
 import * as RouteProcessorABI from "../artifacts/contracts/RouteProcessor.sol/RouteProcessor.json"
 import { UniswapProvider } from "./liquidityProviders/Uniswap";
+import { TridentProvider } from "./liquidityProviders/Trident";
 
 export class Swapper {
   poolRegistarator: PoolRegistarator
@@ -23,14 +24,16 @@ export class Swapper {
   }
 
   async getRoute(tokenIn: Token, amountIn: BigNumber, tokenOut: Token): Promise<MultiRoute> {
-    const sushiProvider: SushiProvider = new SushiProvider(this.poolRegistarator, this.chainDataProvider, this.network)
-    const uniProvider: UniswapProvider = new UniswapProvider(this.poolRegistarator, this.chainDataProvider, this.network)
-    const poolsSu = sushiProvider.getPools(tokenIn, tokenOut)
-    const poolsUni = uniProvider.getPools(tokenIn, tokenOut)
-    const poolsPre = await Promise.all([poolsSu, poolsUni])
-    this.poolsNumber[sushiProvider.getProviderName()] = poolsPre[0].length
-    this.poolsNumber[uniProvider.getProviderName()] = poolsPre[1].length
-    const pools = [...poolsPre[0], ...poolsPre[1]]
+    const providers = [
+      //new SushiProvider(this.poolRegistarator, this.chainDataProvider, this.network),
+      new UniswapProvider(this.poolRegistarator, this.chainDataProvider, this.network),
+      new TridentProvider(this.poolRegistarator, this.chainDataProvider, this.network),
+    ]
+    const poolsPromises = providers.map(p => p.getPools(tokenIn, tokenOut))
+    const poolsArrays = await Promise.all(poolsPromises)
+    poolsArrays.forEach((a, i) => this.poolsNumber[providers[i].getProviderName()] = a.length)
+
+    const pools = poolsArrays.reduce((prev, curr) => prev.concat(curr), [])
     const route = findMultiRouteExactIn(tokenIn, tokenOut, amountIn, pools, this.network.baseWrappedToken,  50e9)
     return route
   }
