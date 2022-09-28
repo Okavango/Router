@@ -34,7 +34,7 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
   await WrappedBaseTokenContract.connect(Alice).approve(routeProcessor.address, amountInBN)
 
   console.log("5. Fetch pools' data ...");    
-  const provider = new ethers.providers.AlchemyProvider(...net.alchemyProviderArgs)
+  const provider = new ethers.providers.AlchemyProvider(...net.alchemyProviderArgs)  
   const swapper = new Swapper(routeProcessor.address, provider, net)
   const route = await swapper.getRoute(net.baseWrappedToken, amountInBN, toToken)
   Object.keys(swapper.poolsNumber).forEach(provider => {
@@ -54,7 +54,7 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
   const code = swapper.getRouteProcessorCode(route, Alice.address)
 
   console.log('8. Call route processor ...');    
-  const amountOutMin = route.amountInBN.mul(getBigNumber((1 - 0.005)*1_000_000)).div(1_000_000)
+  const amountOutMin = route.amountOutBN.mul(getBigNumber((1 - 0.005)*1_000_000)).div(1_000_000)
   const tx = await routeProcessor.processRouteEOA(
     net.baseWrappedToken.address, 
     amountInBN, 
