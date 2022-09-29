@@ -40,7 +40,7 @@ function sortTokens(tokens: Token[]): Token[] {
   return t1.map(([t, ]) => t)
 }
 
-const limited = new Limited(5, 1000)
+const limited = new Limited(12, 1000)
 
 async function getTokenPairPools(
   t0: Token, t1: Token, factory: Contract, 
@@ -115,7 +115,7 @@ export class TridentProvider extends LiquidityProvider {
     const pools = await getAllPools(this.network, tokens, this.chainDataProvider)
     this.registrator.addPools(pools.map(p => p.address), this)
     pools.forEach(p => this.pools.set(p.address, p))
-    console.log("API calls: ", limited.counter);
+    console.log(`    RPC calls were done total: ${limited.counterTotalCall}, failed: ${limited.counterFailedCall}`);
     
     return pools
   }

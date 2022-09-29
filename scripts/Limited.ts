@@ -20,19 +20,27 @@ function getTrottle(times: number, intervalMS: number): () => void {
 
 export class Limited {
     trottle: () => void
-    counter: number
+    counterTotalCall: number
+    counterFailedCall: number
 
     constructor(times: number, intervalMS: number) {
         this.trottle = getTrottle(times, intervalMS)
-        this.counter = 0
+        this.counterTotalCall = 0
+        this.counterFailedCall = 0
     }
 
     async call<T>(func: () => Promise<T>): Promise<T> {
-        await this.trottle()
-        this.counter++
-        console.log(this.counter);
-        
-        return await func()
+        while(1) {
+            await this.trottle()
+            ++this.counterTotalCall
+            //console.log(this.counter);
+            try {
+                return await func()
+            } catch (e) {
+                ++this.counterFailedCall
+                //console.log('Fail!!! Retry')
+            }
+        }
     }
 
 }
