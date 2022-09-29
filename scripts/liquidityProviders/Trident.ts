@@ -7,6 +7,7 @@ import { HEXer } from "../HEXer";
 import { ChainId, Network, Token } from "../networks/Network";
 import { ConstantProductPoolFactoryABI } from "../../ABI/ConstantProductPoolFactoryABI";
 import { ConstantProductPoolABI } from "../../ABI/ConstantProductPoolABI";
+import { Limited } from "../Limited";
 
 const ConstantProductPoolFactory = {
   [ChainId.MATIC]: '0x05689fCfeE31FCe4a67FbC7Cab13E74F80A4E288',
@@ -39,8 +40,9 @@ function sortTokens(tokens: Token[]): Token[] {
   return t1.map(([t, ]) => t)
 }
 
+const limited = new Limited(5, 1000)
+
 async function getAllPools(net: Network, tokens: Token[], chainDataProvider: ethers.providers.BaseProvider): Promise<RPool[]> {
-  debugger
   const factory = await new Contract(
     ConstantProductPoolFactory[net.chainId], 
     ConstantProductPoolFactoryABI, 
@@ -50,15 +52,18 @@ async function getAllPools(net: Network, tokens: Token[], chainDataProvider: eth
   const tokensSorted = sortTokens(tokens)
   for (let i = 0; i < tokensSorted.length; ++i) {
     for (let j = i+1; j < tokensSorted.length; ++j) {
-      const pairPoolsCount = await factory.poolsCount(tokensSorted[i].address, tokensSorted[j].address)
+      const pairPoolsCount = await limited.call(
+        () => factory.poolsCount(tokensSorted[i].address, tokensSorted[j].address)
+      )
       if (pairPoolsCount == 0) continue
-      const pairPools: string[] = await factory.getPools(tokensSorted[i].address, tokensSorted[j].address, 0, pairPoolsCount)
+      const pairPools: string[] = await limited.call(
+        () => factory.getPools(tokensSorted[i].address, tokensSorted[j].address, 0, pairPoolsCount)
+      )
       for (let k = 0; k < pairPools.length; ++k) {
-      //const promises = await pairPools.map(async poolAddress => {
         const poolAddress = pairPools[k]
         const poolContract = await new ethers.Contract(poolAddress, ConstantProductPoolABI, chainDataProvider)
-        const [res0, res1] = await poolContract.getReserves()
-        const fee = await poolContract.swapFee()
+        const [res0, res1] = await limited.call(() => poolContract.getReserves())
+        const fee: BigNumber = await limited.call(() => poolContract.swapFee())
         const pool = new ConstantProductRPool(
           poolAddress, 
           convertTokenToBento(tokensSorted[i]),
@@ -69,10 +74,9 @@ async function getAllPools(net: Network, tokens: Token[], chainDataProvider: eth
         )
         poolData.push(pool)
       }
-      //poolData = poolData.concat(promises)
     }
   }
-  return poolData//await Promise.all(poolData)
+  return poolData
 }
 
 export class TridentProvider extends LiquidityProvider {
@@ -98,6 +102,8 @@ export class TridentProvider extends LiquidityProvider {
     const pools = await getAllPools(this.network, tokens, this.chainDataProvider)
     this.registrator.addPools(pools.map(p => p.address), this)
     pools.forEach(p => this.pools.set(p.address, p))
+    console.log("API calls: ", limited.counter);
+    
     return pools
   }
 
