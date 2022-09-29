@@ -42,41 +42,54 @@ function sortTokens(tokens: Token[]): Token[] {
 
 const limited = new Limited(5, 1000)
 
+async function getTokenPairPools(
+  t0: Token, t1: Token, factory: Contract, 
+  chainDataProvider: ethers.providers.BaseProvider
+): Promise<RPool[]> {
+  const pools:RPool[] = []
+  const pairPoolsCount = await limited.call(
+    () => factory.poolsCount(t0.address, t1.address)
+  )
+  if (pairPoolsCount == 0) return []
+  const pairPools: string[] = await limited.call(
+    () => factory.getPools(t0.address, t1.address, 0, pairPoolsCount)
+  )
+  for (let k = 0; k < pairPools.length; ++k) {
+    const poolAddress = pairPools[k]
+    const poolContract = await new ethers.Contract(poolAddress, ConstantProductPoolABI, chainDataProvider)
+    const [res0, res1] = await limited.call(() => poolContract.getReserves())
+    const fee: BigNumber = await limited.call(() => poolContract.swapFee())
+    const pool = new ConstantProductRPool(
+      poolAddress, 
+      convertTokenToBento(t0),
+      convertTokenToBento(t1),
+      parseInt(fee.toString())/1_000_000,
+      res0,
+      res1
+    )
+    pools.push(pool)
+  }
+  return pools
+}
+
 async function getAllPools(net: Network, tokens: Token[], chainDataProvider: ethers.providers.BaseProvider): Promise<RPool[]> {
   const factory = await new Contract(
     ConstantProductPoolFactory[net.chainId], 
     ConstantProductPoolFactoryABI, 
     chainDataProvider
   )
-  const poolData: RPool[] = []
+  const promises: Promise<RPool[]>[] = []
   const tokensSorted = sortTokens(tokens)
   for (let i = 0; i < tokensSorted.length; ++i) {
     for (let j = i+1; j < tokensSorted.length; ++j) {
-      const pairPoolsCount = await limited.call(
-        () => factory.poolsCount(tokensSorted[i].address, tokensSorted[j].address)
+      promises.push(
+        getTokenPairPools(tokensSorted[i], tokensSorted[j], factory, chainDataProvider)
       )
-      if (pairPoolsCount == 0) continue
-      const pairPools: string[] = await limited.call(
-        () => factory.getPools(tokensSorted[i].address, tokensSorted[j].address, 0, pairPoolsCount)
-      )
-      for (let k = 0; k < pairPools.length; ++k) {
-        const poolAddress = pairPools[k]
-        const poolContract = await new ethers.Contract(poolAddress, ConstantProductPoolABI, chainDataProvider)
-        const [res0, res1] = await limited.call(() => poolContract.getReserves())
-        const fee: BigNumber = await limited.call(() => poolContract.swapFee())
-        const pool = new ConstantProductRPool(
-          poolAddress, 
-          convertTokenToBento(tokensSorted[i]),
-          convertTokenToBento(tokensSorted[j]),
-          parseInt(fee.toString())/1_000_000,
-          res0,
-          res1
-        )
-        poolData.push(pool)
-      }
     }
   }
-  return poolData
+  const poolArrays = await Promise.all(promises)
+  const pools = poolArrays.reduce((a, b) => a.concat(b), [])
+  return pools
 }
 
 export class TridentProvider extends LiquidityProvider {
