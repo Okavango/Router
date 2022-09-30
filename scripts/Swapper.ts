@@ -15,6 +15,7 @@ export class Swapper {
   chainDataProvider: ethers.providers.BaseProvider
   network: Network
   poolsNumber: {[network: string]: number}
+  limited: Limited
 
   constructor(routeProcessor: string, chainDataProvider: ethers.providers.BaseProvider, net: Network) {
     this.poolRegistarator = new PoolRegistarator()
@@ -22,14 +23,14 @@ export class Swapper {
     this.chainDataProvider = chainDataProvider
     this.network = net
     this.poolsNumber = {}
+    this.limited = new Limited(12, 1000)    // Free Alchemy account allows 330/26 eth_calls per second
   }
 
   async getRoute(tokenIn: Token, amountIn: BigNumber, tokenOut: Token): Promise<MultiRoute> {
-    const limited = new Limited(15, 1000)
     const providers = [
-      //new SushiProvider(this.poolRegistarator, this.chainDataProvider, this.network, limited),
-      new UniswapProvider(this.poolRegistarator, this.chainDataProvider, this.network, limited),
-      new TridentProvider(this.poolRegistarator, this.chainDataProvider, this.network, limited),
+      new SushiProvider(this.poolRegistarator, this.chainDataProvider, this.network, this.limited),
+      new UniswapProvider(this.poolRegistarator, this.chainDataProvider, this.network, this.limited),
+      new TridentProvider(this.poolRegistarator, this.chainDataProvider, this.network, this.limited),
     ]
     const poolsPromises = providers.map(p => p.getPools(tokenIn, tokenOut))
     const poolsArrays = await Promise.all(poolsPromises)

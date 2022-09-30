@@ -33,14 +33,20 @@ export class Limited {
         while(1) {
             await this.trottle()
             ++this.counterTotalCall
-            //console.log(this.counter);
+            //console.log(this.counterTotalCall);
             try {
                 return await func()
             } catch (e) {
                 ++this.counterFailedCall
-                //console.log('Fail!!! Retry')
+                //console.log('Fail!!! Retry'+this.counterFailedCall+' successed: '+(this.counterTotalCall -this.counterFailedCall))
             }
         }
+    }
+
+    async callOnce<T>(func: () => Promise<T>): Promise<T> {
+        await this.trottle()
+        ++this.counterTotalCall
+        return await func()
     }
 
 }

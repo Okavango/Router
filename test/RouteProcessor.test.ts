@@ -37,6 +37,9 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
   const provider = new ethers.providers.AlchemyProvider(...net.alchemyProviderArgs)  
   const swapper = new Swapper(routeProcessor.address, provider, net)
   const route = await swapper.getRoute(net.baseWrappedToken, amountInBN, toToken)
+  console.log(
+    `    RPC calls were done total: ${swapper.limited.counterTotalCall}, failed: ${swapper.limited.counterFailedCall}`
+  );
   Object.keys(swapper.poolsNumber).forEach(provider => {
     console.log(`    ${provider}: ${swapper.poolsNumber[provider]} pools were found`)
   })

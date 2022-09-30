@@ -14,8 +14,9 @@ const ConstantProductPoolFactory = {
 }
 
 function convertTokenToBento(token: Token): RToken {
-  const t = {...token}
+  const t:RToken = {...token}
   t.name = `Bnt Share(${token.name})`
+  delete t.tokenId
   return t
 }
 
@@ -28,8 +29,6 @@ function sortTokens(tokens: Token[]): Token[] {
   })
   return t1.map(([t, ]) => t)
 }
-
-const limited = new Limited(12, 1000)
 
 export class TridentProvider extends LiquidityProvider {
   pools: Map<string, RPool>
@@ -50,8 +49,6 @@ export class TridentProvider extends LiquidityProvider {
     const pools = await this._getAllPools(tokens)
     this.registrator.addPools(pools.map(p => p.address), this)
     pools.forEach(p => this.pools.set(p.address, p))
-    console.log(`    RPC calls were done total: ${limited.counterTotalCall}, failed: ${limited.counterFailedCall}`);
-    
     return pools
   }
 
@@ -79,18 +76,18 @@ export class TridentProvider extends LiquidityProvider {
     t0: Token, t1: Token, factory: Contract
   ): Promise<RPool[]> {
     const pools:RPool[] = []
-    const pairPoolsCount = await limited.call(
+    const pairPoolsCount = await this.limited.call(
       () => factory.poolsCount(t0.address, t1.address)
     )
     if (pairPoolsCount == 0) return []
-    const pairPools: string[] = await limited.call(
+    const pairPools: string[] = await this.limited.call(
       () => factory.getPools(t0.address, t1.address, 0, pairPoolsCount)
     )
     for (let k = 0; k < pairPools.length; ++k) {
       const poolAddress = pairPools[k]
       const poolContract = await new ethers.Contract(poolAddress, ConstantProductPoolABI, this.chainDataProvider)
-      const [res0, res1] = await limited.call(() => poolContract.getReserves())
-      const fee: BigNumber = await limited.call(() => poolContract.swapFee())
+      const [res0, res1] = await this.limited.call(() => poolContract.getReserves())
+      const fee: BigNumber = await this.limited.call(() => poolContract.swapFee())
       const pool = new ConstantProductRPool(
         poolAddress, 
         convertTokenToBento(t0),
