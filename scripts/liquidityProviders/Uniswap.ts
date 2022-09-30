@@ -1,5 +1,5 @@
 import { ConstantProductRPool, RouteLeg, RPool } from "@sushiswap/tines";
-import {ethers} from 'ethers'
+import {BigNumber, ethers} from 'ethers'
 import { LiquidityProvider, PoolRegistarator } from "./LiquidityProvider";
 import { getCreate2Address } from "ethers/lib/utils";
 import { keccak256, pack } from '@ethersproject/solidity'
@@ -83,8 +83,8 @@ export class UniswapProvider extends LiquidityProvider {
     const poolAddress = this._getPoolAddress(token0, token1)
     try {
       const pool = await new ethers.Contract(poolAddress, SushiPoolABI, this.chainDataProvider)
-      const reserves = await pool.getReserves()
-      return new ConstantProductRPool(poolAddress, token0, token1, 0.003, reserves.reserve0, reserves.reserve1)
+      const [reserve0, reserve1]:[BigNumber, BigNumber] = await this.limited.callOnce(() => pool.getReserves())      
+      return new ConstantProductRPool(poolAddress, token0, token1, 0.003, reserve0, reserve1)
     } catch (e) {
       return undefined
     }

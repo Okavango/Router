@@ -9,6 +9,7 @@ import { Network, Token } from "../scripts/networks/Network";
 import { POLYGON } from "../scripts/networks/Polygon";
 import { HardhatNetworkConfig } from "hardhat/types";
 
+const delay = async ms => new Promise(res => setTimeout(res, ms));
 
 // Swaps amountIn basewrappedToken(WETH, ...) to toToken
 async function testRouteProcessor(net: Network, amountIn: number, toToken: Token) {
@@ -58,6 +59,7 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
 
   console.log('8. Call route processor ...');    
   const amountOutMin = route.amountOutBN.mul(getBigNumber((1 - 0.005)*1_000_000)).div(1_000_000)
+  await delay(1000) // to make Alchemy API rest a while
   const tx = await routeProcessor.processRouteEOA(
     net.baseWrappedToken.address, 
     amountInBN, 
