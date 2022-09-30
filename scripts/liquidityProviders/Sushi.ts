@@ -6,6 +6,7 @@ import { keccak256, pack } from '@ethersproject/solidity'
 import { SushiPoolABI } from "../../ABI/SushiPool";
 import { HEXer } from "../HEXer";
 import { ChainId, Network, Token } from "../networks/Network";
+import { Limited } from "../Limited";
 
 const SUSHISWAP_FACTORY = {
   [ChainId.ETHEREUM]: '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac',
@@ -17,60 +18,12 @@ const INIT_CODE_HASH = {
   [ChainId.MATIC]:    '0xe18a34eb0e04b04f7a0ac29a6e80748dca96319b42c54d679cb821dca90c6303',
 }
 
-function getAllRouteTokens(net: Network,  t1: Token, t2: Token) {
-  const set = new Set<Token>([
-    t1, 
-    t2, 
-    ...net.BASES_TO_CHECK_TRADES_AGAINST, 
-    ...(net.ADDITIONAL_BASES[t1.address] || []),
-    ...(net.ADDITIONAL_BASES[t2.address] || []),
-   ])
-   return Array.from(set)
-}
-
-export function getPoolAddress(net: Network, t1: Token, t2: Token): string {
-  const [token0, token1] = t1.address.toLowerCase() < t2.address.toLowerCase() ? [t1, t2] : [t2, t1]
-  return getCreate2Address(
-    SUSHISWAP_FACTORY[net.chainId],
-    keccak256(['bytes'], [pack(['address', 'address'], [token0.address, token1.address])]),
-    INIT_CODE_HASH[net.chainId]
-  )
-}
-
-async function getPoolData(net: Network, t0: Token, t1: Token, chainDataProvider: ethers.providers.BaseProvider): 
-  Promise<RPool|undefined> {
-  const [token0, token1] = t0.address.toLowerCase() < t1.address.toLowerCase() ? [t0, t1] : [t1, t0]
-  const poolAddress = getPoolAddress(net, token0, token1)
-  try {
-    const pool = await new ethers.Contract(poolAddress, SushiPoolABI, chainDataProvider)
-    const reserves = await pool.getReserves()
-    return new ConstantProductRPool(poolAddress, token0, token1, 0.003, reserves.reserve0, reserves.reserve1)
-  } catch (e) {
-    return undefined
-  }
-}
-
-async function getAllPools(net: Network, tokens: Token[], chainDataProvider: ethers.providers.BaseProvider): Promise<RPool[]> {
-  const poolData: Promise<RPool|undefined>[] = []
-  for (let i = 0; i < tokens.length; ++i) {
-    for (let j = i+1; j < tokens.length; ++j) {
-      poolData.push(getPoolData(net, tokens[i], tokens[j], chainDataProvider))
-    }
-  }
-  const pools = await Promise.all(poolData)
-  return pools.filter(p => p !== undefined) as RPool[]
-}
-
 export class SushiProvider extends LiquidityProvider {
   pools: Map<string, RPool>
-  chainDataProvider: ethers.providers.BaseProvider
-  network: Network
 
-  constructor(r: PoolRegistarator, chainDataProvider: ethers.providers.BaseProvider, net: Network) {
-    super(r)
+  constructor(r: PoolRegistarator, chainDataProvider: ethers.providers.BaseProvider, net: Network, l: Limited) {
+    super(r, chainDataProvider, net, l)
     this.pools = new Map<string, RPool>()
-    this.chainDataProvider = chainDataProvider
-    this.network = net
   }
 
   getProviderName(): string {return 'Sushiswap'}
@@ -80,8 +33,8 @@ export class SushiProvider extends LiquidityProvider {
       // No sushiswap for this network
       return []
     }
-    const tokens = getAllRouteTokens(this.network, t0, t1)
-    const pools = await getAllPools(this.network, tokens, this.chainDataProvider)
+    const tokens = this._getAllRouteTokens(t0, t1)
+    const pools = await this._getAllPools(tokens)
     this.registrator.addPools(pools.map(p => p.address), this)
     pools.forEach(p => this.pools.set(p.address, p))
     return pools
@@ -105,4 +58,51 @@ export class SushiProvider extends LiquidityProvider {
       return code
     }
   }
+  
+  _getPoolAddress(t1: Token, t2: Token): string {
+    const [token0, token1] = t1.address.toLowerCase() < t2.address.toLowerCase() ? [t1, t2] : [t2, t1]
+    return getCreate2Address(
+      SUSHISWAP_FACTORY[this.network.chainId],
+      keccak256(['bytes'], [pack(['address', 'address'], [token0.address, token1.address])]),
+      INIT_CODE_HASH[this.network.chainId]
+    )
+  }
+
+  async _getPoolData(t0: Token, t1: Token): 
+    Promise<RPool|undefined> {
+    const [token0, token1] = t0.address.toLowerCase() < t1.address.toLowerCase() ? [t0, t1] : [t1, t0]
+    const poolAddress = this._getPoolAddress(token0, token1)
+    try {
+      const pool = await new ethers.Contract(poolAddress, SushiPoolABI, this.chainDataProvider)
+      const reserves = await pool.getReserves()
+      return new ConstantProductRPool(poolAddress, token0, token1, 0.003, reserves.reserve0, reserves.reserve1)
+    } catch (e) {
+      return undefined
+    }
+  }
+
+  async _getAllPools(
+    tokens: Token[]
+  ): Promise<RPool[]> {
+    const poolData: Promise<RPool|undefined>[] = []
+    for (let i = 0; i < tokens.length; ++i) {
+      for (let j = i+1; j < tokens.length; ++j) {
+        poolData.push(this._getPoolData(tokens[i], tokens[j]))
+      }
+    }
+    const pools = await Promise.all(poolData)
+    return pools.filter(p => p !== undefined) as RPool[]
+  }
+
+  _getAllRouteTokens(t1: Token, t2: Token) {
+    const set = new Set<Token>([
+      t1, 
+      t2, 
+      ...this.network.BASES_TO_CHECK_TRADES_AGAINST, 
+      ...(this.network.ADDITIONAL_BASES[t1.address] || []),
+      ...(this.network.ADDITIONAL_BASES[t2.address] || []),
+     ])
+     return Array.from(set)
+  }
+
 }

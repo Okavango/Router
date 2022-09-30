@@ -1,5 +1,7 @@
 import { RouteLeg, RPool } from "@sushiswap/tines"
-import { Token } from "../networks/Network"
+import { ethers } from "ethers"
+import { Limited } from "../Limited"
+import { Network, Token } from "../networks/Network"
 
 export class PoolRegistarator {
     pools: Map<string, LiquidityProvider>
@@ -18,9 +20,20 @@ export class PoolRegistarator {
 
 export abstract class LiquidityProvider {
     registrator: PoolRegistarator
+    limited: Limited
+    chainDataProvider: ethers.providers.BaseProvider
+    network: Network
 
-    constructor(r: PoolRegistarator) {
+    constructor(
+        r: PoolRegistarator, 
+        chainDataProvider: ethers.providers.BaseProvider,
+        network: Network,
+        l: Limited
+    ) {
         this.registrator = r
+        this.limited = l
+        this.chainDataProvider = chainDataProvider
+        this.network = network
     }
 
     // abstract updateData(): void;

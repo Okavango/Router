@@ -13,17 +13,6 @@ const ConstantProductPoolFactory = {
   [ChainId.MATIC]: '0x05689fCfeE31FCe4a67FbC7Cab13E74F80A4E288',
 }
 
-function getAllRouteTokens(net: Network,  t1: Token, t2: Token) {
-  const set = new Set<Token>([
-    t1, 
-    t2, 
-    ...net.BASES_TO_CHECK_TRADES_AGAINST, 
-    ...(net.ADDITIONAL_BASES[t1.address] || []),
-    ...(net.ADDITIONAL_BASES[t2.address] || []),
-   ])
-   return Array.from(set)
-}
-
 function convertTokenToBento(token: Token): RToken {
   const t = {...token}
   t.name = `Bnt Share(${token.name})`
@@ -42,66 +31,12 @@ function sortTokens(tokens: Token[]): Token[] {
 
 const limited = new Limited(12, 1000)
 
-async function getTokenPairPools(
-  t0: Token, t1: Token, factory: Contract, 
-  chainDataProvider: ethers.providers.BaseProvider
-): Promise<RPool[]> {
-  const pools:RPool[] = []
-  const pairPoolsCount = await limited.call(
-    () => factory.poolsCount(t0.address, t1.address)
-  )
-  if (pairPoolsCount == 0) return []
-  const pairPools: string[] = await limited.call(
-    () => factory.getPools(t0.address, t1.address, 0, pairPoolsCount)
-  )
-  for (let k = 0; k < pairPools.length; ++k) {
-    const poolAddress = pairPools[k]
-    const poolContract = await new ethers.Contract(poolAddress, ConstantProductPoolABI, chainDataProvider)
-    const [res0, res1] = await limited.call(() => poolContract.getReserves())
-    const fee: BigNumber = await limited.call(() => poolContract.swapFee())
-    const pool = new ConstantProductRPool(
-      poolAddress, 
-      convertTokenToBento(t0),
-      convertTokenToBento(t1),
-      parseInt(fee.toString())/1_000_000,
-      res0,
-      res1
-    )
-    pools.push(pool)
-  }
-  return pools
-}
-
-async function getAllPools(net: Network, tokens: Token[], chainDataProvider: ethers.providers.BaseProvider): Promise<RPool[]> {
-  const factory = await new Contract(
-    ConstantProductPoolFactory[net.chainId], 
-    ConstantProductPoolFactoryABI, 
-    chainDataProvider
-  )
-  const promises: Promise<RPool[]>[] = []
-  const tokensSorted = sortTokens(tokens)
-  for (let i = 0; i < tokensSorted.length; ++i) {
-    for (let j = i+1; j < tokensSorted.length; ++j) {
-      promises.push(
-        getTokenPairPools(tokensSorted[i], tokensSorted[j], factory, chainDataProvider)
-      )
-    }
-  }
-  const poolArrays = await Promise.all(promises)
-  const pools = poolArrays.reduce((a, b) => a.concat(b), [])
-  return pools
-}
-
 export class TridentProvider extends LiquidityProvider {
   pools: Map<string, RPool>
-  chainDataProvider: ethers.providers.BaseProvider
-  network: Network
-
-  constructor(r: PoolRegistarator, chainDataProvider: ethers.providers.BaseProvider, net: Network) {
-    super(r)
+  
+  constructor(r: PoolRegistarator, chainDataProvider: ethers.providers.BaseProvider, net: Network, l: Limited) {
+    super(r, chainDataProvider, net, l)
     this.pools = new Map<string, RPool>()
-    this.chainDataProvider = chainDataProvider
-    this.network = net
   }
 
   getProviderName(): string {return 'Trident'}
@@ -111,8 +46,8 @@ export class TridentProvider extends LiquidityProvider {
       // No trident for this network
       return []
     }
-    const tokens = getAllRouteTokens(this.network, t0, t1)
-    const pools = await getAllPools(this.network, tokens, this.chainDataProvider)
+    const tokens = this._getAllRouteTokens(t0, t1)
+    const pools = await this._getAllPools(tokens)
     this.registrator.addPools(pools.map(p => p.address), this)
     pools.forEach(p => this.pools.set(p.address, p))
     console.log(`    RPC calls were done total: ${limited.counterTotalCall}, failed: ${limited.counterFailedCall}`);
@@ -138,5 +73,65 @@ export class TridentProvider extends LiquidityProvider {
     //   console.assert(code.length == 62*2, "Sushi.getSwapCodeForRouteProcessor unexpected code length")
     //   return code
     // }
+  }
+
+  async _getTokenPairPools(
+    t0: Token, t1: Token, factory: Contract
+  ): Promise<RPool[]> {
+    const pools:RPool[] = []
+    const pairPoolsCount = await limited.call(
+      () => factory.poolsCount(t0.address, t1.address)
+    )
+    if (pairPoolsCount == 0) return []
+    const pairPools: string[] = await limited.call(
+      () => factory.getPools(t0.address, t1.address, 0, pairPoolsCount)
+    )
+    for (let k = 0; k < pairPools.length; ++k) {
+      const poolAddress = pairPools[k]
+      const poolContract = await new ethers.Contract(poolAddress, ConstantProductPoolABI, this.chainDataProvider)
+      const [res0, res1] = await limited.call(() => poolContract.getReserves())
+      const fee: BigNumber = await limited.call(() => poolContract.swapFee())
+      const pool = new ConstantProductRPool(
+        poolAddress, 
+        convertTokenToBento(t0),
+        convertTokenToBento(t1),
+        parseInt(fee.toString())/1_000_000,
+        res0,
+        res1
+      )
+      pools.push(pool)
+    }
+    return pools
+  }
+
+  async _getAllPools(tokens: Token[]): Promise<RPool[]> {
+    const factory = await new Contract(
+      ConstantProductPoolFactory[this.network.chainId], 
+      ConstantProductPoolFactoryABI, 
+      this.chainDataProvider
+    )
+    const promises: Promise<RPool[]>[] = []
+    const tokensSorted = sortTokens(tokens)
+    for (let i = 0; i < tokensSorted.length; ++i) {
+      for (let j = i+1; j < tokensSorted.length; ++j) {
+        promises.push(
+          this._getTokenPairPools(tokensSorted[i], tokensSorted[j], factory)
+        )
+      }
+    }
+    const poolArrays = await Promise.all(promises)
+    const pools = poolArrays.reduce((a, b) => a.concat(b), [])
+    return pools
+  }
+
+  _getAllRouteTokens(t1: Token, t2: Token) {
+    const set = new Set<Token>([
+      t1, 
+      t2, 
+      ...this.network.BASES_TO_CHECK_TRADES_AGAINST, 
+      ...(this.network.ADDITIONAL_BASES[t1.address] || []),
+      ...(this.network.ADDITIONAL_BASES[t2.address] || []),
+     ])
+     return Array.from(set)
   }
 }

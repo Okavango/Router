@@ -7,6 +7,7 @@ import { getRouteProcessorCode } from "./TinesToRouteProcessor";
 import * as RouteProcessorABI from "../artifacts/contracts/RouteProcessor.sol/RouteProcessor.json"
 import { UniswapProvider } from "./liquidityProviders/Uniswap";
 import { TridentProvider } from "./liquidityProviders/Trident";
+import { Limited } from "./Limited";
 
 export class Swapper {
   poolRegistarator: PoolRegistarator
@@ -24,10 +25,11 @@ export class Swapper {
   }
 
   async getRoute(tokenIn: Token, amountIn: BigNumber, tokenOut: Token): Promise<MultiRoute> {
+    const limited = new Limited(15, 1000)
     const providers = [
-      //new SushiProvider(this.poolRegistarator, this.chainDataProvider, this.network),
-      new UniswapProvider(this.poolRegistarator, this.chainDataProvider, this.network),
-      new TridentProvider(this.poolRegistarator, this.chainDataProvider, this.network),
+      //new SushiProvider(this.poolRegistarator, this.chainDataProvider, this.network, limited),
+      new UniswapProvider(this.poolRegistarator, this.chainDataProvider, this.network, limited),
+      new TridentProvider(this.poolRegistarator, this.chainDataProvider, this.network, limited),
     ]
     const poolsPromises = providers.map(p => p.getPools(tokenIn, tokenOut))
     const poolsArrays = await Promise.all(poolsPromises)
