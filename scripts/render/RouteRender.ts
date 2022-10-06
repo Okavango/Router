@@ -6,6 +6,13 @@ const TOKEN_HEIGH = 100
 const TOKEN_RX = 20
 const TOKEN_RY = TOKEN_RX
 const TOKEN_BETWEEN = 200
+const TOKEN_AROUND = 5
+
+// svg text{
+//     text-anchor: middle;
+//     //alignment-baseline: middle;
+//     //dominant-baseline: central;
+// }
 
 export class RouteRender {
     svg: Svg
@@ -41,10 +48,6 @@ export class RouteRender {
 
         tokens.forEach ((t, i) => this.printToken(t, i))
 
-        this.bbox.x -= 1
-        this.bbox.y -= 1
-        this.bbox.width += 2
-        this.bbox.height += 2
         this.svg.viewbox(this.bbox)
         return this.svg
     }
@@ -60,7 +63,7 @@ export class RouteRender {
         group.text("Test")
             .move(bbox.x + bbox.w/2, bbox.y + bbox.h/2)
             .font({size: 70, family: 'Helvetica'})
-        this._addBox(new Box(x, 0, TOKEN_WIDTH, TOKEN_HEIGH))
+        this._addBox(new Box(x-TOKEN_AROUND, -TOKEN_AROUND, TOKEN_WIDTH + 2*TOKEN_AROUND, TOKEN_HEIGH + 2*TOKEN_AROUND))
     }
 
     _addBox(box: Box) {
