@@ -9,9 +9,9 @@ describe("Route Rendering", async function () {
         const document = window.document
         registerWindow(window, document)
 
-        const render = new RouteRender()
-        const svg = render.insertSVG(document.documentElement)
-        //console.log(svg.svg())        
+        const render = new RouteRender(document.documentElement)
+        const svg = render.renderTest()
+        console.log(svg.svg())        
 
         expect(svg).not.undefined
     })
