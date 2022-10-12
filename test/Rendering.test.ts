@@ -3,7 +3,7 @@ import { createSVGWindow } from 'svgdom'
 import { registerWindow } from '@svgdotjs/svg.js'
 import { RouteRender } from "../scripts/render/RouteRender";
 
-describe("Route Rendering", async function () {
+describe.skip("Route Rendering", async function () {
     it("Simple test", function () {
         const window = createSVGWindow()
         const document = window.document

@@ -454,7 +454,7 @@
     "@ethersproject/logger" "^5.5.0"
     bn.js "^4.11.9"
 
-"@ethersproject/bignumber@^5.0.0", "@ethersproject/bignumber@^5.7.0":
+"@ethersproject/bignumber@^5.7.0":
   version "5.7.0"
   resolved "https://registry.yarnpkg.com/@ethersproject/bignumber/-/bignumber-5.7.0.tgz#e2f03837f268ba655ffba03a57853e18a18dc9c2"
   integrity sha512-n1CAdIHRWjSucQO3MC1zPSVgV/6dy/fjL9pMrPP9peL+QxEg9wOsVqwD4+818B6LUEtaXzVHQiuivzRoxPxUGw==
@@ -1007,12 +1007,12 @@
     tiny-invariant "^1.2.0"
     toformat "^2.0.0"
 
-"@sushiswap/tines@^1.0.0-canary.121":
-  version "1.0.0-canary.121"
-  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-1.0.0-canary.121.tgz#14b928f635ced77d74ed9d5d9c6429eb4dcf07e1"
-  integrity sha512-sSYoBFtWi+JWdslV2EPCoQ3R0GkQ7myKEK2YQ+5yFFq4lWT9TsAFCTVGnCLNxMtaXB+vTkixTec12mW1koa7xQ==
+"@sushiswap/tines@0.1.100":
+  version "0.1.100"
+  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-0.1.100.tgz#198ee8ee125e093775a3d1a503e781ea7e786268"
+  integrity sha512-CO1AWK8YEYvHQ9OBdaqVtKNuRX6UA0+hRBiDGR4JGX3tJYJjT158CbVJhoRQ8mqL7iLv2ZEawzQESHk/MehG6Q==
   dependencies:
-    "@ethersproject/bignumber" "^5.0.0"
+    "@ethersproject/bignumber" "^5.7.0"
     "@sushiswap/currency" "workspace:*"
 
 "@svgdotjs/svg.js@^3.1.2":
