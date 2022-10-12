@@ -1,4 +1,4 @@
-import { findMultiRouteExactIn, getBigNumber, MultiRoute } from "@sushiswap/tines";
+import { findMultiRouteExactIn, getBigNumber, MultiRoute, NetworkInfo } from "@sushiswap/tines";
 import { BigNumber, Contract, ethers } from "ethers";
 import { Network, Token } from "./networks/Network";
 import { PoolRegistarator } from "./liquidityProviders/LiquidityProvider";
@@ -6,7 +6,7 @@ import { SushiProvider } from "./liquidityProviders/Sushi";
 import { getRouteProcessorCode } from "./TinesToRouteProcessor";
 import * as RouteProcessorABI from "../artifacts/contracts/RouteProcessor.sol/RouteProcessor.json"
 import { UniswapProvider } from "./liquidityProviders/Uniswap";
-import { TridentProvider } from "./liquidityProviders/Trident";
+import { convertTokenToBento, getBentoChainId, TridentProvider } from "./liquidityProviders/Trident";
 import { Limited } from "./Limited";
 
 export class Swapper {
@@ -35,9 +35,19 @@ export class Swapper {
     const poolsPromises = providers.map(p => p.getPools(tokenIn, tokenOut))
     const poolsArrays = await Promise.all(poolsPromises)
     poolsArrays.forEach((a, i) => this.poolsNumber[providers[i].getProviderName()] = a.length)
-
     const pools = poolsArrays.reduce((prev, curr) => prev.concat(curr), [])
-    const route = findMultiRouteExactIn(tokenIn, tokenOut, amountIn, pools, this.network.baseWrappedToken,  50e9)
+
+    const networks: NetworkInfo[] = [{
+      chainId: this.network.chainId,
+      baseToken:this.network.baseWrappedToken, 
+      gasPrice: 50e9
+    }, {
+      chainId: getBentoChainId(this.network.chainId),
+      baseToken: convertTokenToBento(this.network.baseWrappedToken), 
+      gasPrice: 50e9
+    }]
+
+    const route = findMultiRouteExactIn(tokenIn, tokenOut, amountIn, pools, networks,  50e9)
     return route
   }
 

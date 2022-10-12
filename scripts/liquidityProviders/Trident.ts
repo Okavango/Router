@@ -1,4 +1,4 @@
-import { ConstantProductRPool, RouteLeg, RPool, RToken } from "@sushiswap/tines";
+import { BridgeBento, ConstantProductRPool, RouteLeg, RPool, RToken } from "@sushiswap/tines";
 import {BigNumber, Contract, ethers} from 'ethers'
 import { LiquidityProvider, PoolRegistarator } from "./LiquidityProvider";
 import { getCreate2Address } from "ethers/lib/utils";
@@ -8,14 +8,25 @@ import { ChainId, Network, Token } from "../networks/Network";
 import { ConstantProductPoolFactoryABI } from "../../ABI/ConstantProductPoolFactoryABI";
 import { ConstantProductPoolABI } from "../../ABI/ConstantProductPoolABI";
 import { Limited } from "../Limited";
+import { BentoBoxABI } from "../../ABI/BentoBoxABI";
 
 const ConstantProductPoolFactory = {
   [ChainId.MATIC]: '0x05689fCfeE31FCe4a67FbC7Cab13E74F80A4E288',
 }
 
-function convertTokenToBento(token: Token): RToken {
+const BentoBox = {
+  [ChainId.MATIC]: '0x0319000133d3AdA02600f0875d2cf03D442C3367',
+}
+
+export function getBentoChainId(chainId: string | number | undefined): string {
+  return `Bento ${chainId}`
+}
+
+export function convertTokenToBento(token: Token): RToken {
   const t:RToken = {...token}
-  t.name = `Bnt Share(${token.name})`
+  t.chainId = getBentoChainId(token.chainId)
+  t.name = getBentoChainId(token.name)
+  t.symbol = getBentoChainId(token.symbol)
   delete t.tokenId
   return t
 }
@@ -46,7 +57,10 @@ export class TridentProvider extends LiquidityProvider {
       return []
     }
     const tokens = this._getAllRouteTokens(t0, t1)
-    const pools = await this._getAllPools(tokens)
+    const tridentPools = await this._getAllPools(tokens)
+    const bridges = await this._getAllBridges(tokens, tridentPools)
+    const pools = tridentPools.concat(bridges)
+
     this.registrator.addPools(pools.map(p => p.address), this)
     pools.forEach(p => this.pools.set(p.address, p))
     return pools
@@ -86,7 +100,7 @@ export class TridentProvider extends LiquidityProvider {
     for (let k = 0; k < pairPools.length; ++k) {
       const poolAddress = pairPools[k]
       const poolContract = await new ethers.Contract(poolAddress, ConstantProductPoolABI, this.chainDataProvider)
-      const [res0, res1] = await this.limited.call(() => poolContract.getReserves())
+      const [res0, res1]: [BigNumber, BigNumber] = await this.limited.call(() => poolContract.getReserves())
       const fee: BigNumber = await this.limited.call(() => poolContract.swapFee())
       const pool = new ConstantProductRPool(
         poolAddress, 
@@ -119,6 +133,36 @@ export class TridentProvider extends LiquidityProvider {
     const poolArrays = await Promise.all(promises)
     const pools = poolArrays.reduce((a, b) => a.concat(b), [])
     return pools
+  }
+
+  async _getAllBridges(tokens:RToken[], pools: RPool[]): Promise<RPool[]> {
+    const tokenBentoMap = new Map<string, RToken>()
+    pools.forEach(p => {
+      tokenBentoMap.set(p.token0.tokenId as string, p.token0)
+      tokenBentoMap.set(p.token1.tokenId as string, p.token1)
+    })
+
+    const tokenOutputMap = new Map<string, RToken>()
+    tokens.forEach(t => tokenOutputMap.set(t.address, t))
+
+    const BentoContract = await new Contract(
+      BentoBox[this.network.chainId], 
+      BentoBoxABI, 
+      this.chainDataProvider
+    )
+    const promises = Array.from(tokenBentoMap.values()).map(async t => {
+      const totals: {elastic: BigNumber, base: BigNumber} = 
+        await this.limited.call(() => BentoContract.totals(t.address))
+      return new BridgeBento(
+        `Bento bridge for ${t.symbol}`,
+        tokenOutputMap.get(t.address) as RToken,
+        t,
+        totals.elastic,
+        totals.base
+      )
+    })
+
+    return await Promise.all(promises)
   }
 
   _getAllRouteTokens(t1: Token, t2: Token) {
