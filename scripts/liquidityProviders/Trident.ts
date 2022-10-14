@@ -14,7 +14,7 @@ const ConstantProductPoolFactory = {
   [ChainId.MATIC]: '0x05689fCfeE31FCe4a67FbC7Cab13E74F80A4E288',
 }
 
-const BentoBox = {
+export const BentoBox = {
   [ChainId.MATIC]: '0x0319000133d3AdA02600f0875d2cf03D442C3367',
 }
 
@@ -64,6 +64,14 @@ export class TridentProvider extends LiquidityProvider {
     this.registrator.addPools(pools.map(p => p.address), this)
     pools.forEach(p => this.pools.set(p.address, p))
     return pools
+  }
+
+  _getCallCodeForRouteProcessor(contractAddress: string, callDataHex: string) {
+    const code = new HEXer()
+      .uint8(10).address(contractAddress)
+      .uint16(callDataHex.length/2)
+      .hexData(callDataHex).toString()
+    return code
   }
 
   getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string): string {

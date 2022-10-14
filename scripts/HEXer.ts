@@ -6,6 +6,7 @@ export class HEXer {
   constructor() {this.hex = ''}
 
   toString() { return this.hex}
+  toString0x() { return '0x' + this.hex}
 
   uint8(data: number): HEXer {
     if (data > 255 || data < 0 || data !== Math.round(data)) {
@@ -58,6 +59,17 @@ export class HEXer {
     }
     // 0xabcd => 0000abcd
     this.hex += addr.slice(2).padStart(40, '0')
+
+    return this
+  }
+
+  hexData(data: string): HEXer {
+    if (data.length % 2 != 0) {
+      throw new Error("Wrong hex data length: " + data.length)
+    }
+
+    if (data.startsWith('0x')) data = data.slice(2)
+    this.hex += data
 
     return this
   }
