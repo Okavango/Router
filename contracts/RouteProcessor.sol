@@ -33,8 +33,8 @@ contract RouteProcessor {
       } else if (commandCode == 2) { // send ERC20 tokens from this router to an address
         position = sendERC20Share(route, position + 1);
 
-      // } else if (commandCode == 10) { // call a function of a contract - pool.swap for example
-      //   position = contractCall(route, position + 1);
+      } else if (commandCode == 10) { // call a function of a contract - pool.swap for example
+        position = contractCall(route, position + 1);
       // } else if (commandCode == 11) { // call a function of a contract with {value: x, gas: y}
       //   position = contractCallValueGas(route, position + 1);
 
@@ -87,9 +87,50 @@ contract RouteProcessor {
     IERC20(token).transferFrom(msg.sender, to, amount);
   }
 
-/*
   // Calls a function of a contract. Expected to be called for pool.swap functions
   function contractCall(bytes memory route, uint position) private returns (uint positionAfter) {
+    address aContract;
+    uint16 callDataSize;
+    bytes memory callDataOffset;
+    uint result;
+    uint rds;
+    bytes memory mem = new bytes(100);
+    uint32 data;
+    assembly {
+      let pos := add(route, position)
+      aContract := mload(add(pos, 20))
+      pos := add(pos, 22)
+      callDataSize := and(mload(pos), 0xffff)
+      callDataOffset := add(pos, callDataSize)
+      result := call(gas(), aContract, 0, callDataOffset, callDataSize, mem, 100)
+      rds := returndatasize()
+      data := mload(callDataOffset)
+    }
+    console.log('Contract: ', aContract);
+    console.log('data: ', data);
+    console.log('Result:', result, rds);
+
+    return position + 22 + callDataSize;
+  }
+
+ /* function contractCall(bytes memory route, uint position) private returns (uint positionAfter) {
+    address NotExistingContract;
+    (bool result, bytes memory returnData) = NotExistingContract.call(route);
+    console.log(result, string(returnData));
+
+    address aContract;
+    assembly {
+      let pos := add(route, position)
+      aContract := mload(add(pos, 20))
+    }
+    // string memory smb = IERC20(aContract).symbol();
+    // console.log(smb);
+
+    return position + 26;
+  }
+/*
+  // Calls a function of a contract with {value: x, gas: y}. Expected to be called for pool.swap functions
+  function contractCallValueGas(bytes memory route, uint position) private returns (uint) {
     address aContract;
     uint16 callDataSize;
     assembly {
@@ -97,23 +138,8 @@ contract RouteProcessor {
       aContract := mload(add(position, 20))
       callDataSize := mload(add(position, 22))
     }
-    
+
     bytes memory callData = route + 22;
-
-    (bool result, bytes memory returnData) = aContract.call(callData);
-    require(result, string(returnData));
-    
-    return position + callDataSize;
-  }
-
-  // Calls a function of a contract with {value: x, gas: y}. Expected to be called for pool.swap functions
-  function contractCallValueGas(bytes memory route, uint position) private returns (uint) {
-    (address aContract, uint16 valueShare, uint32 gas, uint16 callDataSize) = abi.decode(
-      route[position:], 
-      (address, uint16, uint32, uint16)
-    );
-    position += 28;
-    bytes calldata callData = route[position:position + callDataSize];
 
     uint value; unchecked {
       value = address(this).balance * valueShare / 65535;

@@ -8,6 +8,9 @@ import { WETH9ABI } from "../ABI/WETH9";
 import { Network, Token } from "../scripts/networks/Network";
 import { POLYGON } from "../scripts/networks/Polygon";
 import { HardhatNetworkConfig } from "hardhat/types";
+import { HEXer } from "../scripts/HEXer";
+import { AbiCoder } from "ethers/lib/utils";
+import { ERC20ABI } from "../ABI/ERC20";
 
 const delay = async ms => new Promise(res => setTimeout(res, ms));
 
@@ -60,6 +63,8 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
   console.log('8. Call route processor ...');    
   const amountOutMin = route.amountOutBN.mul(getBigNumber((1 - 0.005)*1_000_000)).div(1_000_000)
   await delay(1000) // to make Alchemy API rest a while
+  console.log(code);
+  
   const tx = await routeProcessor.processRouteEOA(
     net.baseWrappedToken.address, 
     amountInBN, 
@@ -81,6 +86,45 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
 }
 
 describe("RouteProcessor", async function () {
+  it("NotExistingContract call check", async function () {
+    const NotExistingContract: NotExistingContract__factory = await ethers.getContractFactory(
+      "NotExistingContract"
+    );
+    const contract = await NotExistingContract.deploy();    
+    await contract.deployed();
+    await contract.contractCall()
+  })
+
+  it.only("Contract call check", async function () {
+    const forking_url = (network.config as HardhatNetworkConfig)?.forking?.url;
+    if (forking_url !== undefined && forking_url.search('polygon') >= 0) {
+      const erc20 = new ethers.utils.Interface(ERC20ABI);
+      const callDataHex: string = erc20.encodeFunctionData('symbol', []);
+
+      const code = new HEXer()
+        .uint8(10).address(POLYGON.tokens.WMATIC.address)
+        .uint16(callDataHex.length/2 - 1)   // -1 for 0x
+        .hexData(callDataHex).toString0x()
+      
+      const RouteProcessor: RouteProcessor__factory = await ethers.getContractFactory(
+        "RouteProcessor"
+      );
+      const routeProcessor = await RouteProcessor.deploy();    
+      await routeProcessor.deployed();
+
+      console.log(code);
+      
+      await routeProcessor.processRouteEOA(
+        POLYGON.tokens.WMATIC.address, 
+        0, 
+        POLYGON.tokens.WMATIC.address, 
+        0, 
+        POLYGON.tokens.WMATIC.address,
+        code
+      )
+    }
+  })
+
   it("Ethereum WETH => FEI check", async function () {
     const forking_url = (network.config as HardhatNetworkConfig)?.forking?.url;
     if (forking_url !== undefined && forking_url.search('eth-mainnet') >= 0) {
