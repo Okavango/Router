@@ -11,16 +11,17 @@ import { HardhatNetworkConfig } from "hardhat/types";
 import { HEXer } from "../scripts/HEXer";
 import { AbiCoder } from "ethers/lib/utils";
 import { ERC20ABI } from "../ABI/ERC20";
+import { BentoBox } from "../scripts/liquidityProviders/Trident";
 
 const delay = async ms => new Promise(res => setTimeout(res, ms));
 
 // Swaps amountIn basewrappedToken(WETH, ...) to toToken
 async function testRouteProcessor(net: Network, amountIn: number, toToken: Token) {
-  console.log(`1. ${net.name} RouteProcessor deployment ...`);    
+  console.log(`1. ${net.name} RouteProcessor deployment ...`);  
   const RouteProcessor: RouteProcessor__factory = await ethers.getContractFactory(
     "RouteProcessor"
   );
-  const routeProcessor = await RouteProcessor.deploy();    
+  const routeProcessor = await RouteProcessor.deploy();//BentoBox[net.chainId]);    
   await routeProcessor.deployed();
   
   console.log("2. User creation ...");
@@ -63,8 +64,6 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
   console.log('8. Call route processor ...');    
   const amountOutMin = route.amountOutBN.mul(getBigNumber((1 - 0.005)*1_000_000)).div(1_000_000)
   await delay(1000) // to make Alchemy API rest a while
-  console.log(code);
-  
   const tx = await routeProcessor.processRouteEOA(
     net.baseWrappedToken.address, 
     amountInBN, 
@@ -86,16 +85,7 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
 }
 
 describe("RouteProcessor", async function () {
-  it("NotExistingContract call check", async function () {
-    const NotExistingContract: NotExistingContract__factory = await ethers.getContractFactory(
-      "NotExistingContract"
-    );
-    const contract = await NotExistingContract.deploy();    
-    await contract.deployed();
-    await contract.contractCall()
-  })
-
-  it.only("Contract call check", async function () {
+  it.skip("Contract call check", async function () {
     const forking_url = (network.config as HardhatNetworkConfig)?.forking?.url;
     if (forking_url !== undefined && forking_url.search('polygon') >= 0) {
       const erc20 = new ethers.utils.Interface(ERC20ABI);

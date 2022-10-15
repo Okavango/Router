@@ -4,10 +4,17 @@ pragma solidity 0.8.11;
 
 import "../interfaces/IERC20.sol";
 import "../interfaces/IUniswapV2Pair.sol";
+import "../interfaces/IBentoBoxMinimal.sol";
+import "../interfaces/IPool.sol";
 import "hardhat/console.sol";
 
 
 contract RouteProcessor {
+  IBentoBoxMinimal BentoBox;
+
+  constructor() {//address _BentoBox) {
+    BentoBox = IBentoBoxMinimal(0x0319000133d3AdA02600f0875d2cf03D442C3367);//IBentoBoxMinimal(_BentoBox);
+  }
 
   // To be used in UI. For External Owner Account only
   function processRouteEOA(
@@ -33,13 +40,17 @@ contract RouteProcessor {
       } else if (commandCode == 2) { // send ERC20 tokens from this router to an address
         position = sendERC20Share(route, position + 1);
 
-      } else if (commandCode == 10) { // call a function of a contract - pool.swap for example
-        position = contractCall(route, position + 1);
-      // } else if (commandCode == 11) { // call a function of a contract with {value: x, gas: y}
-      //   position = contractCallValueGas(route, position + 1);
-
-      } else if (commandCode == 20) { // Sushi/Uniswap pool swap
+      } else if (commandCode == 10) { // Sushi/Uniswap pool swap
         (, position) = swapUniswapPool(route, position + 1);
+
+      } else if (commandCode == 20) {
+        uint transferAmount;
+        (transferAmount, position) = bentoDepositAmountFromSender(tokenIn, route, position + 1);
+        amountInAcc += transferAmount;
+      } else if (commandCode == 21) {
+        position = swapTrident(route, position + 1);
+      } else if (commandCode == 22) {
+        position = bentoWithdrawShare(route, position + 1);
 
       } else revert("Unknown command code");
     }
@@ -87,81 +98,60 @@ contract RouteProcessor {
     IERC20(token).transferFrom(msg.sender, to, amount);
   }
 
-  // Calls a function of a contract. Expected to be called for pool.swap functions
-  function contractCall(bytes memory route, uint position) private returns (uint positionAfter) {
-    address aContract;
-    uint16 callDataSize;
-    bytes memory callDataOffset;
-    uint result;
-    uint rds;
-    bytes memory mem = new bytes(100);
-    uint32 data;
+  // Transfers input tokens from msg.sender to BentoBox. Tokens should be approved
+  // Expected to be launched for initial liquidity distribution from user to Bento, so we know exact amounts
+  function bentoDepositAmountFromSender(address token, bytes memory route, uint position) 
+    private returns (uint amount, uint positionAfter) {
+    address to;
     assembly {
-      let pos := add(route, position)
-      aContract := mload(add(pos, 20))
-      pos := add(pos, 22)
-      callDataSize := and(mload(pos), 0xffff)
-      callDataOffset := add(pos, callDataSize)
-      result := call(gas(), aContract, 0, callDataOffset, callDataSize, mem, 100)
-      rds := returndatasize()
-      data := mload(callDataOffset)
+      route := add(route, position)
+      to := mload(add(route, 20))
+      amount := mload(add(route, 52))
+      positionAfter := add(position, 52)
     }
-    console.log('Contract: ', aContract);
-    console.log('data: ', data);
-    console.log('Result:', result, rds);
 
-    return position + 22 + callDataSize;
+    IERC20(token).transferFrom(msg.sender, address(BentoBox), amount);
+    BentoBox.deposit(token, address(BentoBox), to, amount, 0);
   }
 
- /* function contractCall(bytes memory route, uint position) private returns (uint positionAfter) {
-    address NotExistingContract;
-    (bool result, bytes memory returnData) = NotExistingContract.call(route);
-    console.log(result, string(returnData));
-
-    address aContract;
+  // Withdraw ERC20 tokens from Bento to an address. Quantity for sending is determined by share in 1/65535.
+  // During routing we can't predict in advance the actual value of internal swaps because of slippage,
+  // so we have to work with shares - not fixed amounts
+  function bentoWithdrawShare(bytes memory route, uint position) private returns (uint positionAfter) {
+    address token;
+    address to;
+    uint16 share;
     assembly {
-      let pos := add(route, position)
-      aContract := mload(add(pos, 20))
+      route := add(route, position)
+      token := mload(add(route, 20))
+      to := mload(add(route, 40))
+      share := mload(add(route, 42))
+      positionAfter := add(position, 42)
     }
-    // string memory smb = IERC20(aContract).symbol();
-    // console.log(smb);
 
-    return position + 26;
+    uint amount; unchecked {
+      amount = BentoBox.balanceOf(token, address(this))*share/65535;
+    }
+    BentoBox.withdraw(token, address(this), to, amount, 0);
   }
-/*
-  // Calls a function of a contract with {value: x, gas: y}. Expected to be called for pool.swap functions
-  function contractCallValueGas(bytes memory route, uint position) private returns (uint) {
-    address aContract;
-    uint16 callDataSize;
+
+  // Trident pool swap
+  function swapTrident(bytes memory data, uint position) 
+    private returns (uint positionAfter) {
+    address pool;
+    bytes memory swapData;
+    uint swapDataSize;
     assembly {
-      position := add(route, position)
-      aContract := mload(add(position, 20))
-      callDataSize := mload(add(position, 22))
+      data := add(data, position)
+      pool := mload(add(data, 20))
+      swapData := add(data, 52)
+      swapDataSize := mload(swapData)
     }
+    positionAfter = position + 52 + swapDataSize;
 
-    bytes memory callData = route + 22;
-
-    uint value; unchecked {
-      value = address(this).balance * valueShare / 65535;
-    }
-
-    bool result;
-    bytes memory returnData;
-    if (value != 0) {
-      if (gas != 0) {
-        (result, returnData) = aContract.call{value: value, gas: gas}(callData);
-      } else {
-        (result, returnData) = aContract.call{value: value}(callData);
-      }
-    } else {
-      (result, returnData) = aContract.call{gas: gas}(callData);
-      // use 'contractCall' function for case with no gas neither value
-    }
-    require(result, string(returnData));
-    
-    return position + callDataSize;
+    IPool(pool).swap(swapData);
   }
-*/
+
   // Sushi/Uniswap pool swap
   function swapUniswapPool(bytes memory data, uint position) 
     private returns (uint amountOut, uint positionAfter) {

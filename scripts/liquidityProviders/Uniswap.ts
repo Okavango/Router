@@ -49,7 +49,7 @@ export class UniswapProvider extends LiquidityProvider {
       }
       // swapUniswapPool = 0x20(address pool, address tokenIn, bool direction, address to)
       const code = new HEXer()
-        .uint8(20).address(poolAddress)
+        .uint8(10).address(poolAddress)
         .address(tokenFrom.address).bool(tokenFrom.address == pool.token0.address)
         .address(toAddress).toString()
       console.assert(code.length == 62*2, "UniswapV2.getSwapCodeForRouteProcessor unexpected code length")
