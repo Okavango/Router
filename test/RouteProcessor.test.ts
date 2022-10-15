@@ -1,6 +1,6 @@
 import { ethers, network } from "hardhat";
 import { expect } from "chai";
-import { RouteProcessor__factory } from "../types";
+import { RouteProcessor__factory } from "../types/index";
 import { Swapper } from "../scripts/Swapper";
 import {ETHEREUM} from '../scripts/networks/Ethereum'
 import { getBigNumber } from "@sushiswap/tines";
@@ -21,7 +21,9 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
   const RouteProcessor: RouteProcessor__factory = await ethers.getContractFactory(
     "RouteProcessor"
   );
-  const routeProcessor = await RouteProcessor.deploy();//BentoBox[net.chainId]);    
+  const routeProcessor = await RouteProcessor.deploy(
+    BentoBox[net.chainId] || "0x0000000000000000000000000000000000000000"
+  );    
   await routeProcessor.deployed();
   
   console.log("2. User creation ...");

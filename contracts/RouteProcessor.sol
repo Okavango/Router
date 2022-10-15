@@ -12,8 +12,8 @@ import "hardhat/console.sol";
 contract RouteProcessor {
   IBentoBoxMinimal BentoBox;
 
-  constructor() {//address _BentoBox) {
-    BentoBox = IBentoBoxMinimal(0x0319000133d3AdA02600f0875d2cf03D442C3367);//IBentoBoxMinimal(_BentoBox);
+  constructor(address _BentoBox) {
+    BentoBox = IBentoBoxMinimal(_BentoBox);
   }
 
   // To be used in UI. For External Owner Account only
