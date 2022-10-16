@@ -98,7 +98,7 @@ contract RouteProcessor {
     IERC20(token).transferFrom(msg.sender, to, amount);
   }
 
-  // Transfers input tokens from msg.sender to BentoBox. Tokens should be approved
+  // Transfers input tokens from BentoBox to a pool.
   // Expected to be launched for initial liquidity distribution from user to Bento, so we know exact amounts
   function bentoDepositAmountFromSender(address token, bytes memory route, uint position) 
     private returns (uint amount, uint positionAfter) {
@@ -110,7 +110,7 @@ contract RouteProcessor {
       positionAfter := add(position, 52)
     }
 
-    IERC20(token).transferFrom(msg.sender, address(BentoBox), amount);
+    //IERC20(token).transferFrom(msg.sender, address(BentoBox), amount);
     BentoBox.deposit(token, address(BentoBox), to, amount, 0);
   }
 

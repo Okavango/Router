@@ -74,24 +74,39 @@ export class TridentProvider extends LiquidityProvider {
     return code
   }
 
-  getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string): string {
-    return 'Unimplemented'
-    // const {poolAddress, tokenFrom} = leg
-    // const pool = this.pools.get(poolAddress)
-    // if (pool === undefined) {
-    //   throw new Error("Unknown pool " + poolAddress)
-    // } else {
-    //   if (tokenFrom.address !== pool.token0.address && tokenFrom.address !== pool.token1.address) {
-    //     throw new Error(`Unknown token ${tokenFrom.address} for the pool ${poolAddress}`)
-    //   }
-    //   // swapUniswapPool = 0x20(address pool, address tokenIn, bool direction, address to)
-    //   const code = new HEXer()
-    //     .uint8(20).address(poolAddress)
-    //     .address(tokenFrom.address).bool(tokenFrom.address == pool.token0.address)
-    //     .address(toAddress).toString()
-    //   console.assert(code.length == 62*2, "Sushi.getSwapCodeForRouteProcessor unexpected code length")
-    //   return code
-    // }
+  getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string, exactAmount?: BigNumber): string {
+    if (leg.poolAddress === BentoBox[this.network.chainId]) {
+      const chainId = leg.tokenFrom.chainId
+      if (typeof chainId == 'string' && chainId.startsWith('Bento')) {
+        // From Bento
+        return this._getWithdrawalCode(leg, toAddress)
+      } else {
+        // To Bento
+        return this._getDepositCode(leg, toAddress, exactAmount)
+      }
+    } else {
+      return this._getswapCode(leg, toAddress)
+    }
+  }
+
+  _getDepositCode(leg: RouteLeg, toAddress: string, exactAmount?: BigNumber): string {
+    if (exactAmount === undefined) {
+      throw new Error('_getDepositCode undefined exactAmount')
+    } else {
+      const code = new HEXer()
+          .uint8(20).address(toAddress)
+          .uint(exactAmount).toString()
+      console.assert(code.length == 53*2, "BentoBridge deposit unexpected code length")
+      return code
+    }
+  }
+
+  _getWithdrawalCode(leg: RouteLeg, toAddress: string): string {
+    return 'Unimplemented _getWithdrawalCode'
+  }
+
+  _getswapCode(leg: RouteLeg, toAddress: string): string {
+    return 'Unimplemented _getWithdrawalCode'
   }
 
   async _getTokenPairPools(
@@ -162,7 +177,7 @@ export class TridentProvider extends LiquidityProvider {
       const totals: {elastic: BigNumber, base: BigNumber} = 
         await this.limited.call(() => BentoContract.totals(t.address))
       return new BridgeBento(
-        `Bento bridge for ${t.symbol}`,
+        BentoBox[this.network.chainId],
         tokenOutputMap.get(t.address) as RToken,
         t,
         totals.elastic,

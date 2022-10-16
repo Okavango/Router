@@ -1,5 +1,5 @@
 import { RouteLeg, RPool } from "@sushiswap/tines"
-import { ethers } from "ethers"
+import { BigNumber, ethers } from "ethers"
 import { Limited } from "../Limited"
 import { Network, Token } from "../networks/Network"
 
@@ -39,5 +39,5 @@ export abstract class LiquidityProvider {
     // abstract updateData(): void;
     abstract getProviderName(): string;
     abstract getPools(t0: Token, t1: Token): Promise<RPool[]>;
-    abstract getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string): string;
+    abstract getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string, exactAmount?: BigNumber): string;
 }

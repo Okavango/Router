@@ -22,11 +22,13 @@ export function getRouteProcessorCode(
   // 1. Transfer route.amountIn input tokens from msg.sender to all input pools according to proportion 'leg.absolutePortion'
   const inputLegs = tokenOutputLegs.get(route.fromToken.tokenId as string) as RouteLeg[]
   let inputAmountPrevious: BigNumber = BigNumber.from(0)
+  const inputAmount: Map<RouteLeg, BigNumber> = new Map()
   inputLegs.forEach(l => {
     const amount: BigNumber = l.swapPortion != 1 ? 
       getBigNumber(route.amountIn * l.absolutePortion) : route.amountInBN.sub(inputAmountPrevious)
     res += codeTransferERC20(route.fromToken, l.poolAddress, amount)
     inputAmountPrevious = inputAmountPrevious.add(amount)
+    inputAmount.set(l, amount)
   })
   assert(inputAmountPrevious.eq(route.amountInBN), "Wrong input distribution")
 
@@ -50,7 +52,7 @@ export function getRouteProcessorCode(
       // swap without further fork - send swap's output to the RouteProcessor
       outAddress = routeProcessorAddress
     }
-    res += codeSwap(l, outAddress, reg)
+    res += codeSwap(l, outAddress, reg, inputAmount.get(l))
   })
 
   return res;
@@ -88,10 +90,10 @@ function codeSendERC20(token: RToken, poolAddress: string, share: number): strin
   return code
 }
 
-function codeSwap(leg: RouteLeg, toAddress: string, reg: PoolRegistarator): string {
+function codeSwap(leg: RouteLeg, toAddress: string, reg: PoolRegistarator, exactAmount?: BigNumber): string {
   const provider = reg.getProvider(leg.poolAddress)
   if (provider !== undefined) {
-    const code = provider.getSwapCodeForRouteProcessor(leg, toAddress)
+    const code = provider.getSwapCodeForRouteProcessor(leg, toAddress, exactAmount)
     return code
   } else {
     throw new Error("unknown pool: " + leg.poolAddress)
