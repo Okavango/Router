@@ -36,7 +36,7 @@ export function getRouteProcessorCode(
     // 2.1 Transfer tokens from the routeProcessor contract to the pool if it is necessary
     const neibourLegs = tokenOutputLegs.get(l.tokenFrom.tokenId as string) as RouteLeg[]
     if (neibourLegs.length > 1 && l.tokenFrom != route.fromToken) {
-      res += codeSendERC20(route.fromToken, l.poolAddress, l.swapPortion)
+      res += codeSendERC20(l.tokenFrom, l.poolAddress, l.swapPortion)
     }
 
     // 2.2 Make swap
