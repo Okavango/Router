@@ -4,13 +4,19 @@ import { BigNumber } from "ethers";
 import { HEXer } from "./HEXer";
 import { PoolRegistarator } from "./liquidityProviders/LiquidityProvider";
 
+function last<T>(arr: T[]):T {
+  return arr[arr.length - 1]
+}
+
 export class TinesToRouteProcessor {
   routeProcessorAddress: string
   registrator: PoolRegistarator
+  tokenOutputLegs: Map<string, RouteLeg[]>
 
   constructor(routeProcessorAddress: string, registrator: PoolRegistarator) {
     this.routeProcessorAddress = routeProcessorAddress
     this.registrator = registrator
+    this.tokenOutputLegs = new Map()
   }
 
   getRouteProcessorCode(
@@ -20,33 +26,37 @@ export class TinesToRouteProcessor {
     // 0. Check for no route
     if (route.status == RouteStatus.NoWay || route.legs.length == 0) return ''
 
-    const tokenOutputLegs = this.getTokenOutputLegs(route)
-    //const tokenTransferred = new Map<string, BigNumber>()
+    this.tokenOutputLegs = this.getTokenOutputLegs(route)
 
     let res = '0x'
 
     // 1. Transfer route.amountIn input tokens from msg.sender to all input pools according to proportion 'leg.absolutePortion'
-    const inputLegs = tokenOutputLegs.get(route.fromToken.tokenId as string) as RouteLeg[]
+    const inputDistribution = this.tokenDistribution(route.fromToken)
     let inputAmountPrevious: BigNumber = BigNumber.from(0)
     const inputAmount: Map<RouteLeg, BigNumber> = new Map()
-    inputLegs.forEach(l => {
-      const amount: BigNumber = l.swapPortion != 1 ? 
-        getBigNumber(route.amountIn * l.absolutePortion) : route.amountInBN.sub(inputAmountPrevious)
-      res += this.codeTransferERC20(route.fromToken, l.poolAddress, amount)
-      inputAmountPrevious = inputAmountPrevious.add(amount)
-      inputAmount.set(l, amount)
+    const lastLeg = last(last(inputDistribution)[1])
+    inputDistribution.forEach(([startPoint, legs]) => {
+      let inputAmountForThisStartPoint: BigNumber = BigNumber.from(0)
+      legs.forEach(l => {
+        const amount: BigNumber = l !== lastLeg ? 
+          getBigNumber(route.amountIn * l.absolutePortion) : route.amountInBN.sub(inputAmountPrevious)
+          inputAmountPrevious = inputAmountPrevious.add(amount)
+          inputAmountForThisStartPoint = inputAmountForThisStartPoint.add(amount)
+          inputAmount.set(l, amount)
+      })
+      res += this.codeTransferERC20(route.fromToken, startPoint, inputAmountForThisStartPoint)
     })
     console.assert(inputAmountPrevious.eq(route.amountInBN), "Wrong input distribution")
 
     route.legs.forEach(l => {
       // 2.1 Transfer tokens from the routeProcessor contract to the pool if it is necessary
-      const neibourLegs = tokenOutputLegs.get(l.tokenFrom.tokenId as string) as RouteLeg[]
+      const neibourLegs = this.tokenOutputLegs.get(l.tokenFrom.tokenId as string) as RouteLeg[]
       if (neibourLegs.length > 1 && l.tokenFrom != route.fromToken) {
         res += this.codeSendERC20(l.tokenFrom, l.poolAddress, l.swapPortion)
       }
 
       // 2.2 Make swap
-      const outLegs = tokenOutputLegs.get(l.tokenTo.tokenId as string)
+      const outLegs = this.tokenOutputLegs.get(l.tokenTo.tokenId as string)
       let outAddress
       if (outLegs == undefined) {
         // output leg - send swap's output directly to toAddress
@@ -106,7 +116,20 @@ export class TinesToRouteProcessor {
     }
   }
 
-  //startPoints() {}
+  tokenDistribution(token: RToken): [string, RouteLeg[]][] {
+    const distribution = new Map<string, RouteLeg[]>()
+    const legs = this.tokenOutputLegs.get(token.tokenId as string)
+    legs?.forEach(l => {
+      const provider = this.registrator.getProvider(l.poolAddress)
+      const startPoint = provider?.getLegStartPoint(l)
+      if (startPoint !== undefined) {
+        const legs = distribution.get(startPoint) || []
+        legs.push(l)
+        distribution.set(startPoint, legs)
+      }
+    })
+    return Array.from(distribution.entries())
+  }
 }
 
 export function getRouteProcessorCode(

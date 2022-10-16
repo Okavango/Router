@@ -39,7 +39,7 @@ export abstract class LiquidityProvider {
     abstract getProviderName(): string;
     abstract getPools(t0: Token, t1: Token): Promise<RPool[]>;
     // the address where should be swap amount of liquidity before the swap
-    getPoolStartPoint(leg: RouteLeg): string {
+    getLegStartPoint(leg: RouteLeg): string {
         return leg.poolAddress
     }
     abstract getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string, exactAmount?: BigNumber): string;
