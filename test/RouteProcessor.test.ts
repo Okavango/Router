@@ -1,5 +1,4 @@
 import { ethers, network } from "hardhat";
-import { expect } from "chai";
 import { RouteProcessor__factory } from "../types/index";
 import { Swapper } from "../scripts/Swapper";
 import {ETHEREUM} from '../scripts/networks/Ethereum'
@@ -9,7 +8,6 @@ import { Network, Token } from "../scripts/networks/Network";
 import { POLYGON } from "../scripts/networks/Polygon";
 import { HardhatNetworkConfig } from "hardhat/types";
 import { HEXer } from "../scripts/HEXer";
-import { AbiCoder } from "ethers/lib/utils";
 import { ERC20ABI } from "../ABI/ERC20";
 import { BentoBox } from "../scripts/liquidityProviders/Trident";
 
@@ -101,7 +99,7 @@ describe("RouteProcessor", async function () {
       const RouteProcessor: RouteProcessor__factory = await ethers.getContractFactory(
         "RouteProcessor"
       );
-      const routeProcessor = await RouteProcessor.deploy();    
+      const routeProcessor = await RouteProcessor.deploy(BentoBox[POLYGON.chainId]);    
       await routeProcessor.deployed();
 
       console.log(code);
