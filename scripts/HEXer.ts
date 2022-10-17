@@ -30,6 +30,10 @@ export class HEXer {
     return this
   }
 
+  share16(share: number): HEXer {
+    return this.uint16(Math.round(share*65535))
+  }
+
   uint32(data: number): HEXer {
     if (data >= 256*256*256*256 || data < 0 || data !== Math.round(data)) {
       throw new Error("Wrong uint32: " + data)
@@ -39,17 +43,26 @@ export class HEXer {
     return this
   }
 
-  uint256(data: BigNumber): HEXer {
-    const hex = data.toHexString().slice(2).padStart(64, '0')
-    if (data.lt(0) || hex.length > 64) {
-      throw new Error("Wrong uin256: " + data.toString())
-    }
-    this.hex += hex
+  uint256(data: BigNumber | number): HEXer {
+    if (typeof data == 'number') {
+      if (data > Number.MAX_SAFE_INTEGER || data < 0 || data !== Math.round(data)) {
+        throw new Error("Wrong uint256: " + data)
+      }
+      this.hex += data.toString(16).padStart(64, '0')
+  
+      return this
+    } else {
+      const hex = data.toHexString().slice(2).padStart(64, '0')
+      if (data.lt(0) || hex.length > 64) {
+        throw new Error("Wrong uin256: " + data.toString())
+      }
+      this.hex += hex
 
-    return this
+      return this
+    }
   }
 
-  uint(data: BigNumber): HEXer {
+  uint(data: BigNumber | number): HEXer {
     return this.uint256(data)
   }
 
@@ -69,6 +82,18 @@ export class HEXer {
     }
 
     if (data.startsWith('0x')) data = data.slice(2)
+    this.hex += data
+
+    return this
+  }
+
+  bytes(data: string): HEXer {
+    if (data.length % 2 != 0) {
+      throw new Error("Wrong hex data length: " + data.length)
+    }
+
+    if (data.startsWith('0x')) data = data.slice(2)
+    this.uint(data.length/2)
     this.hex += data
 
     return this

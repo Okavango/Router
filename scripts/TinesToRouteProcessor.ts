@@ -81,7 +81,7 @@ export class TinesToRouteProcessor {
   // Sends tokens from the RouteProcessor to a pool
   codeSendERC20(token: RToken, poolAddress: string, share: number): string {
     const code = new HEXer().uint8(2).address(token.address)
-      .address(poolAddress).uint16(Math.round(share*65535)).toString()
+      .address(poolAddress).share16(share).toString()
     console.assert(code.length == 43*2, "codeSendERC20 unexpected code length")
     return code
   }
@@ -110,7 +110,8 @@ export class TinesToRouteProcessor {
       } else {
         const legsOutput = res.get(tokenId) || new Map()
         const provider = this.registrator.getProvider(l.poolAddress)
-        const startPoint = provider?.getLegStartPoint(l)
+        let startPoint = provider?.getLegStartPoint(l)
+        if (startPoint == 'RouteProcessor') startPoint = this.routeProcessorAddress
         if (startPoint !== undefined) {
           const legs = legsOutput.get(startPoint) || []
           legs.push(l)

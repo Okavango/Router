@@ -28,8 +28,8 @@ export class Swapper {
 
   async getRoute(tokenIn: Token, amountIn: BigNumber, tokenOut: Token): Promise<MultiRoute> {
     const providers = [
-      new SushiProvider(this.poolRegistarator, this.chainDataProvider, this.network, this.limited),
-      new UniswapProvider(this.poolRegistarator, this.chainDataProvider, this.network, this.limited),
+      //new SushiProvider(this.poolRegistarator, this.chainDataProvider, this.network, this.limited),
+      //new UniswapProvider(this.poolRegistarator, this.chainDataProvider, this.network, this.limited),
       new TridentProvider(this.poolRegistarator, this.chainDataProvider, this.network, this.limited),
     ]
     const poolsPromises = providers.map(p => p.getPools(tokenIn, tokenOut))

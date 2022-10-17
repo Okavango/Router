@@ -75,7 +75,7 @@ export class TridentProvider extends LiquidityProvider {
   }
 
   getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string, exactAmount?: BigNumber): string {
-    if (leg.poolAddress === BentoBox[this.network.chainId]) {
+    if (leg.poolAddress.startsWith('Bento')) {
       const chainId = leg.tokenFrom.chainId
       if (typeof chainId == 'string' && chainId.startsWith('Bento')) {
         // From Bento
@@ -102,11 +102,29 @@ export class TridentProvider extends LiquidityProvider {
   }
 
   _getWithdrawalCode(leg: RouteLeg, toAddress: string): string {
-    return 'Unimplemented _getWithdrawalCode'
+    const code = new HEXer()
+      .uint8(22)
+      .address(leg.tokenFrom.address)
+      .address(toAddress)
+      .share16(1) // TODO !!!!
+      .toString()
+    console.assert(code.length == 43*2, "BentoBridge withdraw unexpected code length")
+    return code
   }
 
+  // TODO: Only ConstantProductPool
   _getswapCode(leg: RouteLeg, toAddress: string): string {
-    return 'Unimplemented _getWithdrawalCode'
+    const coder = new ethers.utils.AbiCoder()
+    // TODO: add unwrap bento = true variant 
+    // address tokenIn, address recipient, bool unwrapBento
+    const poolData = coder.encode(["address", "address", "bool"], [leg.tokenFrom.address, toAddress, false])
+    const code = new HEXer()
+      .uint8(21)
+      .address(leg.poolAddress)
+      .bytes(poolData)
+      .toString()
+      
+    return code
   }
 
   async _getTokenPairPools(
@@ -177,7 +195,7 @@ export class TridentProvider extends LiquidityProvider {
       const totals: {elastic: BigNumber, base: BigNumber} = 
         await this.limited.call(() => BentoContract.totals(t.address))
       return new BridgeBento(
-        BentoBox[this.network.chainId],
+        `Bento bridge for ${t.symbol}`,
         tokenOutputMap.get(t.address) as RToken,
         t,
         totals.elastic,
@@ -197,5 +215,20 @@ export class TridentProvider extends LiquidityProvider {
       ...(this.network.ADDITIONAL_BASES[t2.address] || []),
      ])
      return Array.from(set)
+  }
+
+  getLegStartPoint(leg: RouteLeg): string {
+    if (leg.poolAddress.startsWith('Bento')) {  // Bridge
+      const chainId = leg.tokenFrom.chainId
+      if (typeof chainId == 'string' && chainId.startsWith('Bento')) {
+        // From Bento
+        return 'RouteProcessor'
+      } else {
+        // To Bento
+        return BentoBox[this.network.chainId]
+      }
+    } else {
+      return leg.poolAddress
+    }
   }
 }

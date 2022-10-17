@@ -37,6 +37,7 @@ contract RouteProcessor {
         uint transferAmount;
         (transferAmount, position) = transferERC20Amount(tokenIn, route, position + 1);
         amountInAcc += transferAmount;
+
       } else if (commandCode == 2) { // send ERC20 tokens from this router to an address
         position = sendERC20Share(route, position + 1);
 
@@ -44,9 +45,9 @@ contract RouteProcessor {
         (, position) = swapUniswapPool(route, position + 1);
 
       } else if (commandCode == 20) {
-        uint transferAmount;
-        (transferAmount, position) = bentoDepositAmountFromSender(tokenIn, route, position + 1);
-        amountInAcc += transferAmount;
+        //uint transferAmount;
+        (, position) = bentoDepositAmountFromSender(tokenIn, route, position + 1);
+        //amountInAcc += transferAmount;
       } else if (commandCode == 21) {
         position = swapTrident(route, position + 1);
       } else if (commandCode == 22) {

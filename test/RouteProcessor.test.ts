@@ -125,7 +125,7 @@ describe("RouteProcessor", async function () {
   it("Polygon WMATIC => FEI check", async function () {
     const forking_url = (network.config as HardhatNetworkConfig)?.forking?.url;
     if (forking_url !== undefined && forking_url.search('polygon') >= 0) {
-      await testRouteProcessor(POLYGON, 9000, POLYGON.tokens.SUSHI)
+      await testRouteProcessor(POLYGON, 9, POLYGON.tokens.SUSHI)
     }
   })
 });
