@@ -50,6 +50,8 @@ contract RouteProcessor {
       } else if (commandCode == 21) {
         position = swapTrident(route, position + 1);
       } else if (commandCode == 22) {
+        position = bentoSend(route, position + 1);
+      } else if (commandCode == 23) {
         position = bentoWithdrawShare(route, position + 1);
 
       } else revert("Unknown command code");
@@ -150,6 +152,26 @@ contract RouteProcessor {
     positionAfter = position + 52 + swapDataSize;
 
     IPool(pool).swap(swapData);
+  }
+
+  // Thansfer Bento shares token from routeProcessor to 'to'
+  function bentoSend(bytes memory data, uint position) 
+    private returns (uint positionAfter) {
+    address token;
+    address to;
+    uint16 portion;
+    assembly {
+      data := add(data, position)
+      token := mload(add(data, 20))
+      to := mload(add(data, 40))
+      portion := mload(add(data, 42))
+      positionAfter := add(position, 42)
+    }
+
+    uint shares; unchecked {
+      shares = BentoBox.balanceOf(token, address(this))*portion/65535;
+    }
+    BentoBox.transfer(token, address(this), to, shares);
   }
 
   // Sushi/Uniswap pool swap

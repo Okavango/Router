@@ -24,7 +24,7 @@ export class UniswapProvider extends LiquidityProvider {
     this.pools = new Map<string, RPool>()
   }
 
-  getProviderName(): string {return 'UniswapV2'}
+  getPoolProviderName(): string {return 'UniswapV2'}
 
   async getPools(t0: Token, t1: Token): Promise<RPool[]> {
     if (UNISWAP_V2_FACTORY[this.network.chainId] === undefined) {

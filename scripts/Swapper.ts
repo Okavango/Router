@@ -34,7 +34,7 @@ export class Swapper {
     ]
     const poolsPromises = providers.map(p => p.getPools(tokenIn, tokenOut))
     const poolsArrays = await Promise.all(poolsPromises)
-    poolsArrays.forEach((a, i) => this.poolsNumber[providers[i].getProviderName()] = a.length)
+    poolsArrays.forEach((a, i) => this.poolsNumber[providers[i].getPoolProviderName()] = a.length)
     const pools = poolsArrays.reduce((prev, curr) => prev.concat(curr), [])
 
     const networks: NetworkInfo[] = [{
@@ -58,7 +58,7 @@ export class Swapper {
   }
 
   getPoolsProviderName(poolAddress: string): string {
-    return this.poolRegistarator.getProvider(poolAddress)?.getProviderName() as string
+    return this.poolRegistarator.getPoolProvider(poolAddress)?.getPoolProviderName() as string
   }
   // async callRouteProcessor(code: string) {
   //   const routeProcessor = new Contract(this.routeProcessor, RouteProcessorABI, "RouteProcessor")

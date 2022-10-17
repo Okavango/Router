@@ -87,7 +87,7 @@ export class TinesToRouteProcessor {
   }
 
   codeSwap(leg: RouteLeg, toAddress: string, reg: PoolRegistarator, exactAmount?: BigNumber): string {
-    const provider = reg.getProvider(leg.poolAddress)
+    const provider = reg.getPoolProvider(leg.poolAddress)
     if (provider !== undefined) {
       const code = provider.getSwapCodeForRouteProcessor(leg, toAddress, exactAmount)
       return code
@@ -109,7 +109,7 @@ export class TinesToRouteProcessor {
         console.assert(0, "Unset tokenId")
       } else {
         const legsOutput = res.get(tokenId) || new Map()
-        const provider = this.registrator.getProvider(l.poolAddress)
+        const provider = this.registrator.getPoolProvider(l.poolAddress)
         let startPoint = provider?.getLegStartPoint(l)
         if (startPoint == 'RouteProcessor') startPoint = this.routeProcessorAddress
         if (startPoint !== undefined) {

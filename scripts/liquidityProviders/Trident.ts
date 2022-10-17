@@ -49,7 +49,7 @@ export class TridentProvider extends LiquidityProvider {
     this.pools = new Map<string, RPool>()
   }
 
-  getProviderName(): string {return 'Trident'}
+  getPoolProviderName(): string {return 'Trident'}
 
   async getPools(t0: Token, t1: Token): Promise<RPool[]> {
     if (ConstantProductPoolFactory[this.network.chainId] === undefined) {
@@ -62,6 +62,7 @@ export class TridentProvider extends LiquidityProvider {
     const pools = tridentPools.concat(bridges)
 
     this.registrator.addPools(pools.map(p => p.address), this)
+    this.registrator.addTokens(this._getAllBentoTokens(tridentPools).map(t => t.tokenId as string), this)
     pools.forEach(p => this.pools.set(p.address, p))
     return pools
   }
@@ -103,7 +104,7 @@ export class TridentProvider extends LiquidityProvider {
 
   _getWithdrawalCode(leg: RouteLeg, toAddress: string): string {
     const code = new HEXer()
-      .uint8(22)
+      .uint8(23)
       .address(leg.tokenFrom.address)
       .address(toAddress)
       .share16(1) // TODO !!!!
@@ -124,6 +125,17 @@ export class TridentProvider extends LiquidityProvider {
       .bytes(poolData)
       .toString()
       
+    return code
+  }
+
+  getTokenSendCodeFromRouteProcessor(leg: RouteLeg, toAddress: string, share: number): string {
+    const code = new HEXer()
+      .uint8(22)
+      .address(leg.tokenFrom.address)
+      .address(toAddress)
+      .share16(share)
+      .toString()
+    console.assert(code.length == 43*2, "BentoBridge withdraw unexpected code length")
     return code
   }
 
@@ -174,6 +186,16 @@ export class TridentProvider extends LiquidityProvider {
     const poolArrays = await Promise.all(promises)
     const pools = poolArrays.reduce((a, b) => a.concat(b), [])
     return pools
+  }
+
+  _getAllBentoTokens(pools: RPool[]): RToken[] {
+    const tokenBentoMap = new Map<string, RToken>()
+    pools.forEach(p => {
+      tokenBentoMap.set(p.token0.tokenId as string, p.token0)
+      tokenBentoMap.set(p.token1.tokenId as string, p.token1)
+    })
+
+    return Array.from(tokenBentoMap.values())
   }
 
   async _getAllBridges(tokens:RToken[], pools: RPool[]): Promise<RPool[]> {

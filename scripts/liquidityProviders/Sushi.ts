@@ -26,7 +26,7 @@ export class SushiProvider extends LiquidityProvider {
     this.pools = new Map<string, RPool>()
   }
 
-  getProviderName(): string {return 'Sushiswap'}
+  getPoolProviderName(): string {return 'Sushiswap'}
 
   async getPools(t0: Token, t1: Token): Promise<RPool[]> {
     if (SUSHISWAP_FACTORY[this.network.chainId] === undefined) {
