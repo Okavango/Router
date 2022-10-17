@@ -45,9 +45,8 @@ contract RouteProcessor {
         (, position) = swapUniswapPool(route, position + 1);
 
       } else if (commandCode == 20) {
-        //uint transferAmount;
         (, position) = bentoDepositAmountFromSender(tokenIn, route, position + 1);
-        //amountInAcc += transferAmount;
+        
       } else if (commandCode == 21) {
         position = swapTrident(route, position + 1);
       } else if (commandCode == 22) {
