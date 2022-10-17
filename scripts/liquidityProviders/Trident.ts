@@ -147,7 +147,7 @@ export class TridentProvider extends LiquidityProvider {
         poolAddress, 
         convertTokenToBento(t0),
         convertTokenToBento(t1),
-        parseInt(fee.toString())/1_000_000,
+        parseInt(fee.toString())/10_000,
         res0,
         res1
       )
