@@ -3,7 +3,7 @@ import { BigNumber, ethers } from "ethers";
 import { Network, Token } from "./networks/Network";
 import { SushiProvider } from "./liquidityProviders/Sushi";
 import { getRouteProcessorCode } from "./TinesToRouteProcessor";
-import { UniswapProvider } from "./liquidityProviders/Uniswap";
+import { UniswapProvider } from "./liquidityProviders/UniswapV2";
 import { convertTokenToBento, getBentoChainId, TridentProvider } from "./liquidityProviders/Trident";
 import { Limited } from "./Limited";
 import { PoolCode } from "./pools/PoolCode";
@@ -27,7 +27,7 @@ export class Swapper {
 
   async getRoute(tokenIn: Token, amountIn: BigNumber, tokenOut: Token): Promise<MultiRoute> {
     const providers = [
-      //new SushiProvider(this.poolRegistarator, this.chainDataProvider, this.network, this.limited),
+      new SushiProvider(this.chainDataProvider, this.network, this.limited),
       new UniswapProvider(this.chainDataProvider, this.network, this.limited),
       //new TridentProvider(this.poolRegistarator, this.chainDataProvider, this.network, this.limited),
     ]

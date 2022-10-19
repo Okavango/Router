@@ -1,12 +1,13 @@
-import { ConstantProductRPool, RouteLeg, RPool } from "@sushiswap/tines";
+import { ConstantProductRPool} from "@sushiswap/tines";
 import {BigNumber, ethers} from 'ethers'
-import { LiquidityProvider, PoolRegistarator } from "./LiquidityProvider";
+import { LiquidityProvider } from "./LiquidityProvider";
 import { getCreate2Address } from "ethers/lib/utils";
 import { keccak256, pack } from '@ethersproject/solidity'
 import { SushiPoolABI } from "../../ABI/SushiPool";
-import { HEXer } from "../HEXer";
 import { ChainId, Network, Token } from "../networks/Network";
 import { Limited } from "../Limited";
+import { PoolCode } from "../pools/PoolCode";
+import { ConstantProductPoolCode } from "../pools/ConstantProductPool";
 
 const SUSHISWAP_FACTORY = {
   [ChainId.ETHEREUM]: '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac',
@@ -19,44 +20,21 @@ const INIT_CODE_HASH = {
 }
 
 export class SushiProvider extends LiquidityProvider {
-  pools: Map<string, RPool>
 
-  constructor(r: PoolRegistarator, chainDataProvider: ethers.providers.BaseProvider, net: Network, l: Limited) {
-    super(r, chainDataProvider, net, l)
-    this.pools = new Map<string, RPool>()
+  constructor(chainDataProvider: ethers.providers.BaseProvider, net: Network, l: Limited) {
+    super(chainDataProvider, net, l)
   }
 
   getPoolProviderName(): string {return 'Sushiswap'}
 
-  async getPools(t0: Token, t1: Token): Promise<RPool[]> {
+  async getPools(t0: Token, t1: Token): Promise<PoolCode[]> {
     if (SUSHISWAP_FACTORY[this.network.chainId] === undefined) {
       // No sushiswap for this network
       return []
     }
     const tokens = this._getAllRouteTokens(t0, t1)
     const pools = await this._getAllPools(tokens)
-    this.registrator.addPools(pools.map(p => p.address), this)
-    pools.forEach(p => this.pools.set(p.address, p))
     return pools
-  }
-
-  getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string): string {
-    const {poolAddress, tokenFrom} = leg
-    const pool = this.pools.get(poolAddress)
-    if (pool === undefined) {
-      throw new Error("Unknown pool " + poolAddress)
-    } else {
-      if (tokenFrom.address !== pool.token0.address && tokenFrom.address !== pool.token1.address) {
-        throw new Error(`Unknown token ${tokenFrom.address} for the pool ${poolAddress}`)
-      }
-      // swapUniswapPool = 0x20(address pool, address tokenIn, bool direction, address to)
-      const code = new HEXer()
-        .uint8(10).address(poolAddress)
-        .address(tokenFrom.address).bool(tokenFrom.address == pool.token0.address)
-        .address(toAddress).toString()
-      console.assert(code.length == 62*2, "Sushi.getSwapCodeForRouteProcessor unexpected code length")
-      return code
-    }
   }
   
   _getPoolAddress(t1: Token, t2: Token): string {
@@ -69,13 +47,14 @@ export class SushiProvider extends LiquidityProvider {
   }
 
   async _getPoolData(t0: Token, t1: Token): 
-    Promise<RPool|undefined> {
+    Promise<PoolCode|undefined> {
     const [token0, token1] = t0.address.toLowerCase() < t1.address.toLowerCase() ? [t0, t1] : [t1, t0]
     const poolAddress = this._getPoolAddress(token0, token1)
     try {
       const pool = await new ethers.Contract(poolAddress, SushiPoolABI, this.chainDataProvider)
       const [reserve0, reserve1]:[BigNumber, BigNumber] = await this.limited.callOnce(() => pool.getReserves())
-      return new ConstantProductRPool(poolAddress, token0, token1, 0.003, reserve0, reserve1)
+      const rPool = new ConstantProductRPool(poolAddress, token0, token1, 0.003, reserve0, reserve1)
+      return new ConstantProductPoolCode(rPool, this.getPoolProviderName())
     } catch (e) {
       return undefined
     }
@@ -83,15 +62,15 @@ export class SushiProvider extends LiquidityProvider {
 
   async _getAllPools(
     tokens: Token[]
-  ): Promise<RPool[]> {
-    const poolData: Promise<RPool|undefined>[] = []
+  ): Promise<PoolCode[]> {
+    const poolData: Promise<PoolCode|undefined>[] = []
     for (let i = 0; i < tokens.length; ++i) {
       for (let j = i+1; j < tokens.length; ++j) {
         poolData.push(this._getPoolData(tokens[i], tokens[j]))
       }
     }
     const pools = await Promise.all(poolData)
-    return pools.filter(p => p !== undefined) as RPool[]
+    return pools.filter(p => p !== undefined) as PoolCode[]
   }
 
   _getAllRouteTokens(t1: Token, t2: Token) {

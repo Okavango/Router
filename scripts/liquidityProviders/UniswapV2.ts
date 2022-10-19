@@ -63,7 +63,7 @@ export class UniswapProvider extends LiquidityProvider {
       const pool = await new ethers.Contract(poolAddress, SushiPoolABI, this.chainDataProvider)
       const [reserve0, reserve1]:[BigNumber, BigNumber] = await this.limited.callOnce(() => pool.getReserves())      
       const rPool = new ConstantProductRPool(poolAddress, token0, token1, 0.003, reserve0, reserve1)
-      return new ConstantProductPoolCode(rPool, 'Uniswap');
+      return new ConstantProductPoolCode(rPool, this.getPoolProviderName());
     } catch (e) {
       return undefined
     }

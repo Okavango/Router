@@ -269,7 +269,7 @@ contract RouteProcessor {
       }
       IERC20(token).transferFrom(msg.sender, to, amount);
     }
-    positionAfter = position + 1 + num*52;
+    positionAfter = position + 1 + uint(num)*52;
   }
 
   // Distributes input Bento tokens from msg.sender to addresses. Tokens should be approved
@@ -294,7 +294,7 @@ contract RouteProcessor {
       }
       BentoBox.transfer(token, msg.sender, to, share);
     }
-    positionAfter = position + 1 + num*52;
+    positionAfter = position + 1 + uint(num)*52;
   }
 
   // Distribute ERC20 tokens from this routeProcessor to addresses. 
@@ -325,7 +325,7 @@ contract RouteProcessor {
       }
       IERC20(token).transfer(to, amount);
     }
-    positionAfter = position + 21 + num*22;
+    positionAfter = position + 21 + uint(num)*22;
   }
 
   // Distribute Bento tokens from this routeProcessor to addresses. 
@@ -356,6 +356,6 @@ contract RouteProcessor {
       }
       BentoBox.transfer(token, address(this), to, amount);
     }
-    positionAfter = position + 21 + num*22;
+    positionAfter = position + 21 + uint(num)*22;
   }
 }
