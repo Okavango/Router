@@ -7,6 +7,12 @@ struct Rebase {
     uint128 base;
 }
 
+struct StrategyData {
+    uint64 strategyStartDate;
+    uint64 targetPercentage;
+    uint128 balance; // the balance of the strategy that BentoBox thinks is in there
+}
+
 /// @notice A rebasing library
 library RebaseLibrary {
     /// @notice Calculates the base value in relationship to `elastic` and `total`.
@@ -103,6 +109,8 @@ interface IBentoBoxMinimal {
 
     /// @dev Reads the Rebase `totals`from storage for a given token
     function totals(address token) external view returns (Rebase memory total);
+
+    function strategyData(address token) external view returns (StrategyData memory total);
 
     /// @dev Approves users' BentoBox assets to a "master" contract.
     function setMasterContractApproval(

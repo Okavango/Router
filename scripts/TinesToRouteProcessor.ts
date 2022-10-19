@@ -8,15 +8,26 @@ function last<T>(arr: T[]):T {
   return arr[arr.length - 1]
 }
 
+enum TokenType {
+  ERC20 = 'ERC20',
+  'BENTO' = 'BENTO'
+}
+
+function getTokenType(token: RToken): TokenType {
+  return typeof token.chainId == 'string' && token.chainId.startsWith('Bento') ? TokenType.BENTO : TokenType.ERC20
+}
+
 export class TinesToRouteProcessor {
   routeProcessorAddress: string
   registrator: PoolRegistarator
   tokenDistribution: Map<string, [string, RouteLeg[]][]>
+  tokenOutputLegs: Map<string, RouteLeg[]>
 
   constructor(routeProcessorAddress: string, registrator: PoolRegistarator) {
     this.routeProcessorAddress = routeProcessorAddress
     this.registrator = registrator
     this.tokenDistribution = new Map()
+    this.tokenOutputLegs = new Map()
   }
 
   getRouteProcessorCode(
@@ -95,6 +106,21 @@ export class TinesToRouteProcessor {
       throw new Error("unknown pool: " + leg.poolAddress)
     }
   }
+
+  // Distributes tokens from msg.sender to a pool
+  codeDistributeAmount(token: RToken, amount: BigNumber): string {
+    // const legs = this.tokenOutputLegs.get(token.tokenId as string) as RouteLeg[]
+    // // TODO: remove transfers from RP to RP
+
+    // const hex = new HEXer().uint8(getTokenType(token) == TokenType.ERC20 ? 3 : 24).uint8(legs.length)
+    // legs.forEach(l => {
+
+    // })
+    // .address(poolAddress).uint(amount).toString()
+    // console.assert(code.length == 53*2, "codeTransferERC20 unexpected code length")
+    // return code
+    return 'Unimplemented'
+  }
   
   getTokenDistribution(token: RToken): [string, RouteLeg[]][] {
     return this.tokenDistribution.get(token.tokenId as string) || []
@@ -127,6 +153,23 @@ export class TinesToRouteProcessor {
     Array.from(res.entries()).forEach(([tokenId, map]) => {
       this.tokenDistribution.set(tokenId, Array.from(map.entries()))
     })
+  }
+
+  calcTokenOutputLegs(route: MultiRoute) {
+    const res = new Map<string, RouteLeg[]>()
+
+    route.legs.forEach(l => {
+      const tokenId = l.tokenFrom.tokenId?.toString()
+      if (tokenId === undefined) {
+        console.assert(0, "Unseted tokenId")
+      } else {
+        const legsOutput = res.get(tokenId) || []
+        legsOutput.push(l)
+        res.set(tokenId, legsOutput)
+      }
+    })
+
+    this.tokenOutputLegs = res
   }
 }
 

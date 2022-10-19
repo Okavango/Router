@@ -51,19 +51,27 @@ contract RouteProcessor {
         (, position) = swapUniswapPool(route, position + 1);
 
       } else if (commandCode == 20) {
-        (, position) = bentoDepositAmountFromSender(tokenIn, route, position + 1);        
+        uint transferAmount;
+        (transferAmount, position) = bentoDepositAmountFromBento(tokenIn, route, position + 1);
+        amountInAcc += transferAmount;        
       } else if (commandCode == 21) {
         position = swapTrident(route, position + 1);
       } else if (commandCode == 22) {
         position = bentoSend(route, position + 1);
       } else if (commandCode == 23) {
-        position = bentoWithdrawShare(route, position + 1);
+        uint transferAmount;
+        (transferAmount, position) = bentoWithdrawShareFromRP(tokenIn, route, position + 1);
+        amountInAcc += transferAmount;
       } else if (commandCode == 24) { // distribute Bento tokens from msg.sender to an address
         uint transferAmount;
         (transferAmount, position) = distributeBentoShares(tokenIn, route, position + 1);
         amountInAcc += transferAmount;
       } else if (commandCode == 25) {
         position = distributeBentoPortions(route, position + 1);
+      } else if (commandCode == 26) {
+        position = bentoDepositAllFromBento(route, position + 1);
+      } else if (commandCode == 27) {
+        position = bentoWithdrawAllFromRP(route, position + 1);
 
       } else revert("Unknown command code");
     }
@@ -113,7 +121,7 @@ contract RouteProcessor {
 
   // Transfers input tokens from BentoBox to a pool.
   // Expected to be launched for initial liquidity distribution from user to Bento, so we know exact amounts
-  function bentoDepositAmountFromSender(address token, bytes memory route, uint position) 
+  function bentoDepositAmountFromBento(address token, bytes memory route, uint position) 
     private returns (uint amount, uint positionAfter) {
     address to;
     assembly {
@@ -127,24 +135,50 @@ contract RouteProcessor {
     BentoBox.deposit(token, address(BentoBox), to, amount, 0);
   }
 
-  // Withdraw ERC20 tokens from Bento to an address. Quantity for sending is determined by share in 1/65535.
-  // During routing we can't predict in advance the actual value of internal swaps because of slippage,
-  // so we have to work with shares - not fixed amounts
-  function bentoWithdrawShare(bytes memory route, uint position) private returns (uint positionAfter) {
+  // Transfers all input tokens from BentoBox to a pool
+  function bentoDepositAllFromBento(bytes memory route, uint position) 
+    private returns (uint positionAfter) {
+    address to;
+    address token;
+    assembly {
+      route := add(route, position)
+      to := mload(add(route, 20))
+      token := mload(add(route, 40))
+      positionAfter := add(position, 40)
+    }
+
+    uint amount = IERC20(token).balanceOf(address(BentoBox))
+      + BentoBox.strategyData(token).balance
+      - BentoBox.totals(token).elastic;
+    BentoBox.deposit(token, address(BentoBox), to, amount, 0);
+  }
+
+  // Withdraw Bento tokens from Bento to an address.
+  function bentoWithdrawShareFromRP(address token, bytes memory route, uint position)
+    private returns (uint amount, uint positionAfter) {
+    address to;
+    assembly {
+      route := add(route, position)
+      to := mload(add(route, 20))
+      amount := mload(add(route, 52))
+      positionAfter := add(position, 52)
+    }
+
+    BentoBox.withdraw(token, address(this), to, amount, 0);
+  }
+
+  // Withdraw all Bento tokens from Bento to an address.
+  function bentoWithdrawAllFromRP(bytes memory route, uint position) private returns (uint positionAfter) {
     address token;
     address to;
-    uint16 share;
     assembly {
       route := add(route, position)
       token := mload(add(route, 20))
       to := mload(add(route, 40))
-      share := mload(add(route, 42))
-      positionAfter := add(position, 42)
+      positionAfter := add(position, 40)
     }
 
-    uint amount; unchecked {
-      amount = BentoBox.balanceOf(token, address(this))*share/65535;
-    }
+    uint amount = BentoBox.balanceOf(token, address(this));
     BentoBox.withdraw(token, address(this), to, amount, 0);
   }
 
