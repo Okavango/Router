@@ -15,7 +15,7 @@ export abstract class PoolCode {
 
   // the address where should be swap amount of liquidity before the swap
   // returns RouteProcessorAddress if it is a RouteProcessor
-  getStartPoint(leg: RouteLeg, route: MultiRoute): string {
+  getStartPoint(_leg: RouteLeg, _route: MultiRoute): string {
     return this.pool.address
   }
 

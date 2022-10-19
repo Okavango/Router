@@ -1,16 +1,14 @@
-import { findMultiRouteExactIn, getBigNumber, MultiRoute, NetworkInfo } from "@sushiswap/tines";
-import { BigNumber, Contract, ethers } from "ethers";
+import { findMultiRouteExactIn, MultiRoute, NetworkInfo } from "@sushiswap/tines";
+import { BigNumber, ethers } from "ethers";
 import { Network, Token } from "./networks/Network";
 import { SushiProvider } from "./liquidityProviders/Sushi";
 import { getRouteProcessorCode } from "./TinesToRouteProcessor";
-import * as RouteProcessorABI from "../artifacts/contracts/RouteProcessor.sol/RouteProcessor.json"
 import { UniswapProvider } from "./liquidityProviders/Uniswap";
 import { convertTokenToBento, getBentoChainId, TridentProvider } from "./liquidityProviders/Trident";
 import { Limited } from "./Limited";
 import { PoolCode } from "./pools/PoolCode";
 
 export class Swapper {
-  //poolRegistarator: PoolRegistarator
   routeProcessor: string
   chainDataProvider: ethers.providers.BaseProvider
   network: Network
@@ -19,7 +17,6 @@ export class Swapper {
   pools: Map<string, PoolCode>
 
   constructor(routeProcessor: string, chainDataProvider: ethers.providers.BaseProvider, net: Network) {
-    //this.poolRegistarator = new PoolRegistarator()
     this.routeProcessor = routeProcessor
     this.chainDataProvider = chainDataProvider
     this.network = net
@@ -56,7 +53,6 @@ export class Swapper {
   }
 
   getRouteProcessorCode(route: MultiRoute, to: string): string {
-    //const amountOutMin = route.amountInBN.mul(getBigNumber((1 - slippageTolerance)*1_000_000)).div(1_000_000)
     const code = getRouteProcessorCode(route, this.routeProcessor, to, this.pools)
     return code
   }
@@ -65,7 +61,5 @@ export class Swapper {
     const pc = this.pools.get(poolAddress) as PoolCode
     return pc.providerName
   }
-  // async callRouteProcessor(code: string) {
-  //   const routeProcessor = new Contract(this.routeProcessor, RouteProcessorABI, "RouteProcessor")
-  // }
+
 }

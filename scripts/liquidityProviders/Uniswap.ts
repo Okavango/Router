@@ -18,11 +18,9 @@ const INIT_CODE_HASH = {
 }
 
 export class UniswapProvider extends LiquidityProvider {
-  //pools: Map<string, RPool>
 
   constructor(chainDataProvider: ethers.providers.BaseProvider, net: Network, l: Limited) {
     super(chainDataProvider, net, l)
-    //this.pools = new Map<string, RPool>()
   }
 
   getPoolProviderName(): string {return 'UniswapV2'}
@@ -34,29 +32,8 @@ export class UniswapProvider extends LiquidityProvider {
     }
     const tokens = this._getAllRouteTokens(t0, t1)
     const pools = await this._getAllPools(tokens)
-    //this.registrator.addPools(pools.map(p => p.address), this)
-    //pools.forEach(p => this.pools.set(p.pool.address, p))
     return pools
   }
-
-  // getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string): string {
-  //   const {poolAddress, tokenFrom} = leg
-  //   const pool = this.pools.get(poolAddress)
-  //   if (pool === undefined) {
-  //     throw new Error("Unknown pool " + poolAddress)
-  //   } else {
-  //     if (tokenFrom.address !== pool.token0.address && tokenFrom.address !== pool.token1.address) {
-  //       throw new Error(`Unknown token ${tokenFrom.address} for the pool ${poolAddress}`)
-  //     }
-  //     // swapUniswapPool = 0x20(address pool, address tokenIn, bool direction, address to)
-  //     const code = new HEXer()
-  //       .uint8(10).address(poolAddress)
-  //       .address(tokenFrom.address).bool(tokenFrom.address == pool.token0.address)
-  //       .address(toAddress).toString()
-  //     console.assert(code.length == 62*2, "UniswapV2.getSwapCodeForRouteProcessor unexpected code length")
-  //     return code
-  //   }
-  // }
 
   _getAllRouteTokens(t1: Token, t2: Token) {
     const set = new Set<Token>([

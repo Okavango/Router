@@ -158,39 +158,6 @@ export class TinesToRouteProcessor {
     console.assert(code.length == (22 + legs.length*22)*2, "codeDistributeTokenShares unexpected code length")
     return code
   }
-  
-  // getTokenDistribution(token: RToken): [string, RouteLeg[]][] {
-  //   return this.tokenDistribution.get(token.tokenId as string) || []
-  // }
-
-  // calcTokensDistribution(route: MultiRoute) {
-  //   const res = new Map<string, Map<string, RouteLeg[]>>()
-
-  //   route.legs.forEach(l => {
-  //     const tokenId = l.tokenFrom.tokenId?.toString()
-  //     if (tokenId === undefined) {
-  //       console.assert(0, "Unset tokenId")
-  //     } else {
-  //       const legsOutput = res.get(tokenId) || new Map()
-  //       const provider = this.registrator.getPoolProvider(l.poolAddress)
-  //       let startPoint = provider?.getLegStartPoint(l)
-  //       if (startPoint == 'RouteProcessor') startPoint = this.routeProcessorAddress
-  //       if (startPoint !== undefined) {
-  //         const legs = legsOutput.get(startPoint) || []
-  //         legs.push(l)
-  //         legsOutput.set(startPoint, legs)
-  //       } else {
-  //         throw new Error('Route leg doesn\'t have a startpoint')
-  //       }
-  //       res.set(tokenId, legsOutput)
-  //     }
-  //   })
-
-  //   this.tokenDistribution = new Map()
-  //   Array.from(res.entries()).forEach(([tokenId, map]) => {
-  //     this.tokenDistribution.set(tokenId, Array.from(map.entries()))
-  //   })
-  // }
 
   calcTokenOutputLegs(route: MultiRoute) {
     const res = new Map<string, RouteLeg[]>()
