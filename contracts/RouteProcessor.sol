@@ -17,6 +17,7 @@ contract RouteProcessor {
     BentoBox = IBentoBoxMinimal(_BentoBox);
   }
 
+  // TODO: reduce else/if gas
   // To be used in UI. For External Owner Account only
   function processRouteEOA(
     address tokenIn,
@@ -313,13 +314,14 @@ contract RouteProcessor {
     uint amountTotal = IERC20(token).balanceOf(address(this));
 
     address to;  
-    uint amount;  
     for (uint i = 0; i < num; ++i) {
+      uint amount;  
       assembly {
         to := mload(add(route, 20))
         route := add(route, 22)
         let share := and(mload(route), 0xffff)
         amount := div(mul(amountTotal, share), 65535)
+        amountTotal := sub(amountTotal, amount)
       }
       IERC20(token).transfer(to, amount);
     }
@@ -343,13 +345,14 @@ contract RouteProcessor {
     uint amountTotal = BentoBox.balanceOf(token, address(this));
 
     address to;  
-    uint amount;  
     for (uint i = 0; i < num; ++i) {
+      uint amount;  
       assembly {
         to := mload(add(route, 20))
         route := add(route, 22)
         let share := and(mload(route), 0xffff)
         amount := div(mul(amountTotal, share), 65535)
+        amountTotal := sub(amountTotal, amount)
       }
       BentoBox.transfer(token, address(this), to, amount);
     }

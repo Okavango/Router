@@ -2,7 +2,7 @@
 import {getBigNumber, MultiRoute, RouteLeg, RouteStatus, RToken} from "@sushiswap/tines"
 import { BigNumber } from "ethers";
 import { HEXer } from "./HEXer";
-import { PoolRegistarator } from "./liquidityProviders/LiquidityProvider";
+import { PoolCode } from "./pools/PoolCode";
 
 function last<T>(arr: T[]):T {
   return arr[arr.length - 1]
@@ -19,14 +19,12 @@ function getTokenType(token: RToken): TokenType {
 
 export class TinesToRouteProcessor {
   routeProcessorAddress: string
-  registrator: PoolRegistarator
-  tokenDistribution: Map<string, [string, RouteLeg[]][]>
+  pools: Map<string, PoolCode>
   tokenOutputLegs: Map<string, RouteLeg[]>
 
-  constructor(routeProcessorAddress: string, registrator: PoolRegistarator) {
+  constructor(routeProcessorAddress: string, pools: Map<string, PoolCode>) {
     this.routeProcessorAddress = routeProcessorAddress
-    this.registrator = registrator
-    this.tokenDistribution = new Map()
+    this.pools = pools
     this.tokenOutputLegs = new Map()
   }
 
@@ -37,52 +35,37 @@ export class TinesToRouteProcessor {
     // 0. Check for no route
     if (route.status == RouteStatus.NoWay || route.legs.length == 0) return ''
 
-    this.calcTokensDistribution(route)  // sets this.tokenDistribution
-
+    this.calcTokenOutputLegs(route)
     let res = '0x'
 
-    // 1. Transfer route.amountIn input tokens from msg.sender to all input pools according to proportion 'leg.absolutePortion'
-    const inputDistribution = this.getTokenDistribution(route.fromToken)
-    let inputAmountPrevious: BigNumber = BigNumber.from(0)
-    const inputAmount: Map<RouteLeg, BigNumber> = new Map()
-    const lastLeg = last(last(inputDistribution)[1])
-    inputDistribution.forEach(([startPoint, legs]) => {
-      let inputAmountForThisStartPoint: BigNumber = BigNumber.from(0)
-      legs.forEach(l => {
-        const amount: BigNumber = l !== lastLeg ? 
-          getBigNumber(route.amountIn * l.absolutePortion) : route.amountInBN.sub(inputAmountPrevious)
-          inputAmountPrevious = inputAmountPrevious.add(amount)
-          inputAmountForThisStartPoint = inputAmountForThisStartPoint.add(amount)
-          inputAmount.set(l, amount)
-      })
-      res += this.codeTransferERC20(route.fromToken, startPoint, inputAmountForThisStartPoint)
-    })
-    console.assert(inputAmountPrevious.eq(route.amountInBN), "Wrong input distribution")
+    const [initialCode, exactAmount] = this.codeDistributeInitial(route)
+    res += initialCode
 
+    const distributedTokens = new Set([route.fromToken.tokenId])
     route.legs.forEach(l => {
       // 2.1 Transfer tokens from the routeProcessor contract to the pool if it is neccessary
-      const neibourDistribution = this.getTokenDistribution(l.tokenFrom)
-      if (neibourDistribution.length > 1 && l.tokenFrom != route.fromToken) {
-        res += this.codeSendERC20(l.tokenFrom, l.poolAddress, l.swapPortion)
+      if (!distributedTokens.has(l.tokenFrom.tokenId)) {
+        res += this.codeDistributeTokenShares(l.tokenFrom, route)
+        distributedTokens.add(l.tokenFrom.tokenId)
       }
 
       // 2.2 Make swap
       let outAddress
-      const outputDistribution = this.getTokenDistribution(l.tokenTo)
+      const outputDistribution = this.tokenOutputLegs.get(l.tokenTo.tokenId as string) || []
       if (outputDistribution.length == 0) {
         outAddress = toAddress
       } else if (outputDistribution.length == 1) {
-        outAddress = outputDistribution[0][0]
+        outAddress = this.getPoolCode(outputDistribution[0]).getStartPoint(l, route)
       } else {
         outAddress = this.routeProcessorAddress
       }
-      res += this.codeSwap(l, outAddress, this.registrator, inputAmount.get(l))
+      res += this.codeSwap(l, route, outAddress, exactAmount.get(l.tokenFrom.tokenId as string))
     })
 
     return res;
   }
 
-  // Transfers tokens from msg.sender to a pool
+ /* // Transfers tokens from msg.sender to a pool
   codeTransferERC20(token: RToken, poolAddress: string, amount: BigNumber): string {
     const code = new HEXer().uint8(1).address(poolAddress).uint(amount).toString()
     console.assert(code.length == 53*2, "codeTransferERC20 unexpected code length")
@@ -95,65 +78,119 @@ export class TinesToRouteProcessor {
       .address(poolAddress).share16(share).toString()
     console.assert(code.length == 43*2, "codeSendERC20 unexpected code length")
     return code
-  }
+  }*/
 
-  codeSwap(leg: RouteLeg, toAddress: string, reg: PoolRegistarator, exactAmount?: BigNumber): string {
-    const provider = reg.getPoolProvider(leg.poolAddress)
-    if (provider !== undefined) {
-      const code = provider.getSwapCodeForRouteProcessor(leg, toAddress, exactAmount)
-      return code
-    } else {
-      throw new Error("unknown pool: " + leg.poolAddress)
+  getPoolCode(l: RouteLeg): PoolCode {
+    const pc = this.pools.get(l.poolAddress)
+    if (pc === undefined) {
+      throw new Error(`unknown pool: ${l.poolAddress}`)
     }
+    return pc
   }
 
-  // Distributes tokens from msg.sender to a pool
-  codeDistributeAmount(token: RToken, amount: BigNumber): string {
-    // const legs = this.tokenOutputLegs.get(token.tokenId as string) as RouteLeg[]
-    // // TODO: remove transfers from RP to RP
-
-    // const hex = new HEXer().uint8(getTokenType(token) == TokenType.ERC20 ? 3 : 24).uint8(legs.length)
-    // legs.forEach(l => {
-
-    // })
-    // .address(poolAddress).uint(amount).toString()
-    // console.assert(code.length == 53*2, "codeTransferERC20 unexpected code length")
-    // return code
-    return 'Unimplemented'
-  }
-  
-  getTokenDistribution(token: RToken): [string, RouteLeg[]][] {
-    return this.tokenDistribution.get(token.tokenId as string) || []
+  codeSwap(leg: RouteLeg, route: MultiRoute, to: string, exactAmount?: BigNumber): string {
+    const pc = this.getPoolCode(leg)
+    return pc.getSwapCodeForRouteProcessor(leg, route, to, exactAmount)
   }
 
-  calcTokensDistribution(route: MultiRoute) {
-    const res = new Map<string, Map<string, RouteLeg[]>>()
+  //TODO: use 1 transfer optimization
+  // Distributes tokens from msg.sender to pools
+  codeDistributeInitial(route: MultiRoute): [string, Map<string, BigNumber>] {
+    const legs = this.tokenOutputLegs.get(route.fromToken.tokenId as string) as RouteLeg[]
+    const legsAddr: [RouteLeg, string][] = legs.map(l => {
+      const pc = this.getPoolCode(l)
+      const startPoint = pc.getStartPoint(l, route)
+      return [l, startPoint == PoolCode.RouteProcessorAddress ? this.routeProcessorAddress : startPoint]
+    })
 
-    route.legs.forEach(l => {
-      const tokenId = l.tokenFrom.tokenId?.toString()
-      if (tokenId === undefined) {
-        console.assert(0, "Unset tokenId")
+    const hex = new HEXer()
+      .uint8(getTokenType(route.fromToken) == TokenType.ERC20 ? 3 : 24)
+      .uint8(legsAddr.length)
+
+    let inputAmountPrevious: BigNumber = BigNumber.from(0)
+    const lastLeg = last(legsAddr)[0]
+    const exactAmount = new Map<string, BigNumber>()
+    legsAddr.forEach(([leg, poolAddress]) => {
+      const amount: BigNumber = leg !== lastLeg ? 
+          getBigNumber(route.amountIn * leg.absolutePortion) : route.amountInBN.sub(inputAmountPrevious)
+      hex.address(poolAddress).uint(amount)
+      inputAmountPrevious = inputAmountPrevious.add(amount)
+      exactAmount.set(poolAddress, amount)
+    })
+    const code = hex.toString()
+    console.assert(code.length == (2 + legsAddr.length*52)*2, "codeDistributeInitial unexpected code length")
+    return [code, exactAmount]
+  }
+
+  // Distributes tokens from RP to pools
+  codeDistributeTokenShares(token: RToken, route: MultiRoute): string {
+    const legs = this.tokenOutputLegs.get(token.tokenId as string) as RouteLeg[]
+    if (legs.length <= 1) {
+      return '' // No distribution is needed
+    }
+
+    const RPStartPointsNum = legs.filter(l => {
+      const pc = this.getPoolCode(l)
+      const startPoint = pc.getStartPoint(l, route)
+      return startPoint == PoolCode.RouteProcessorAddress
+    }).length
+    if (RPStartPointsNum > 1) {
+      throw new Error('More than one RouteProcessor for a token is not supported')
+    }
+
+    const hex = new HEXer()
+      .uint8(getTokenType(token) == TokenType.ERC20 ? 4 : 25)
+      .address(token.address)
+      .uint8(legs.length - RPStartPointsNum)
+
+    let unmovedPart = 0
+    legs.forEach(l => {
+      const pc = this.getPoolCode(l)
+      const startPoint = pc.getStartPoint(l, route)
+      if (startPoint == PoolCode.RouteProcessorAddress) {
+        unmovedPart += l.swapPortion
       } else {
-        const legsOutput = res.get(tokenId) || new Map()
-        const provider = this.registrator.getPoolProvider(l.poolAddress)
-        let startPoint = provider?.getLegStartPoint(l)
-        if (startPoint == 'RouteProcessor') startPoint = this.routeProcessorAddress
-        if (startPoint !== undefined) {
-          const legs = legsOutput.get(startPoint) || []
-          legs.push(l)
-          legsOutput.set(startPoint, legs)
-        } else {
-          throw new Error('Route leg doesn\'t have a startpoint')
-        }
-        res.set(tokenId, legsOutput)
+        const amount = l.swapPortion*(1-unmovedPart)
+        hex.address(startPoint).share16(amount)
       }
     })
-
-    this.tokenDistribution = new Map()
-    Array.from(res.entries()).forEach(([tokenId, map]) => {
-      this.tokenDistribution.set(tokenId, Array.from(map.entries()))
-    })
+    const code = hex.toString()
+    console.assert(code.length == (22 + legs.length*22)*2, "codeDistributeTokenShares unexpected code length")
+    return code
   }
+  
+  // getTokenDistribution(token: RToken): [string, RouteLeg[]][] {
+  //   return this.tokenDistribution.get(token.tokenId as string) || []
+  // }
+
+  // calcTokensDistribution(route: MultiRoute) {
+  //   const res = new Map<string, Map<string, RouteLeg[]>>()
+
+  //   route.legs.forEach(l => {
+  //     const tokenId = l.tokenFrom.tokenId?.toString()
+  //     if (tokenId === undefined) {
+  //       console.assert(0, "Unset tokenId")
+  //     } else {
+  //       const legsOutput = res.get(tokenId) || new Map()
+  //       const provider = this.registrator.getPoolProvider(l.poolAddress)
+  //       let startPoint = provider?.getLegStartPoint(l)
+  //       if (startPoint == 'RouteProcessor') startPoint = this.routeProcessorAddress
+  //       if (startPoint !== undefined) {
+  //         const legs = legsOutput.get(startPoint) || []
+  //         legs.push(l)
+  //         legsOutput.set(startPoint, legs)
+  //       } else {
+  //         throw new Error('Route leg doesn\'t have a startpoint')
+  //       }
+  //       res.set(tokenId, legsOutput)
+  //     }
+  //   })
+
+  //   this.tokenDistribution = new Map()
+  //   Array.from(res.entries()).forEach(([tokenId, map]) => {
+  //     this.tokenDistribution.set(tokenId, Array.from(map.entries()))
+  //   })
+  // }
 
   calcTokenOutputLegs(route: MultiRoute) {
     const res = new Map<string, RouteLeg[]>()
@@ -177,8 +214,8 @@ export function getRouteProcessorCode(
   route: MultiRoute, 
   routeProcessorAddress: string, 
   toAddress: string,
-  reg: PoolRegistarator
+  pools: Map<string, PoolCode>
 ): string {
-  const rpc = new TinesToRouteProcessor(routeProcessorAddress, reg)
+  const rpc = new TinesToRouteProcessor(routeProcessorAddress, pools)
   return rpc.getRouteProcessorCode(route, toAddress)
 }

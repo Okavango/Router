@@ -1,12 +1,13 @@
-import { ConstantProductRPool, RouteLeg, RPool } from "@sushiswap/tines";
+import { ConstantProductRPool} from "@sushiswap/tines";
 import {BigNumber, ethers} from 'ethers'
-import { LiquidityProvider, PoolRegistarator } from "./LiquidityProvider";
+import { LiquidityProvider } from "./LiquidityProvider";
 import { getCreate2Address } from "ethers/lib/utils";
 import { keccak256, pack } from '@ethersproject/solidity'
 import { SushiPoolABI } from "../../ABI/SushiPool";
-import { HEXer } from "../HEXer";
 import { Token, Network, ChainId } from "../networks/Network";
 import { Limited } from "../Limited";
+import { PoolCode } from "../pools/PoolCode";
+import { ConstantProductPoolCode } from "../pools/ConstantProductPool";
 
 const UNISWAP_V2_FACTORY = {
   [ChainId.ETHEREUM]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'
@@ -17,45 +18,45 @@ const INIT_CODE_HASH = {
 }
 
 export class UniswapProvider extends LiquidityProvider {
-  pools: Map<string, RPool>
+  //pools: Map<string, RPool>
 
-  constructor(r: PoolRegistarator, chainDataProvider: ethers.providers.BaseProvider, net: Network, l: Limited) {
-    super(r, chainDataProvider, net, l)
-    this.pools = new Map<string, RPool>()
+  constructor(chainDataProvider: ethers.providers.BaseProvider, net: Network, l: Limited) {
+    super(chainDataProvider, net, l)
+    //this.pools = new Map<string, RPool>()
   }
 
   getPoolProviderName(): string {return 'UniswapV2'}
 
-  async getPools(t0: Token, t1: Token): Promise<RPool[]> {
+  async getPools(t0: Token, t1: Token): Promise<PoolCode[]> {
     if (UNISWAP_V2_FACTORY[this.network.chainId] === undefined) {
       // No uniswap for this network
       return []
     }
     const tokens = this._getAllRouteTokens(t0, t1)
     const pools = await this._getAllPools(tokens)
-    this.registrator.addPools(pools.map(p => p.address), this)
-    pools.forEach(p => this.pools.set(p.address, p))
+    //this.registrator.addPools(pools.map(p => p.address), this)
+    //pools.forEach(p => this.pools.set(p.pool.address, p))
     return pools
   }
 
-  getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string): string {
-    const {poolAddress, tokenFrom} = leg
-    const pool = this.pools.get(poolAddress)
-    if (pool === undefined) {
-      throw new Error("Unknown pool " + poolAddress)
-    } else {
-      if (tokenFrom.address !== pool.token0.address && tokenFrom.address !== pool.token1.address) {
-        throw new Error(`Unknown token ${tokenFrom.address} for the pool ${poolAddress}`)
-      }
-      // swapUniswapPool = 0x20(address pool, address tokenIn, bool direction, address to)
-      const code = new HEXer()
-        .uint8(10).address(poolAddress)
-        .address(tokenFrom.address).bool(tokenFrom.address == pool.token0.address)
-        .address(toAddress).toString()
-      console.assert(code.length == 62*2, "UniswapV2.getSwapCodeForRouteProcessor unexpected code length")
-      return code
-    }
-  }
+  // getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string): string {
+  //   const {poolAddress, tokenFrom} = leg
+  //   const pool = this.pools.get(poolAddress)
+  //   if (pool === undefined) {
+  //     throw new Error("Unknown pool " + poolAddress)
+  //   } else {
+  //     if (tokenFrom.address !== pool.token0.address && tokenFrom.address !== pool.token1.address) {
+  //       throw new Error(`Unknown token ${tokenFrom.address} for the pool ${poolAddress}`)
+  //     }
+  //     // swapUniswapPool = 0x20(address pool, address tokenIn, bool direction, address to)
+  //     const code = new HEXer()
+  //       .uint8(10).address(poolAddress)
+  //       .address(tokenFrom.address).bool(tokenFrom.address == pool.token0.address)
+  //       .address(toAddress).toString()
+  //     console.assert(code.length == 62*2, "UniswapV2.getSwapCodeForRouteProcessor unexpected code length")
+  //     return code
+  //   }
+  // }
 
   _getAllRouteTokens(t1: Token, t2: Token) {
     const set = new Set<Token>([
@@ -78,26 +79,27 @@ export class UniswapProvider extends LiquidityProvider {
   }
   
   async _getPoolData(t0: Token, t1: Token): 
-    Promise<RPool|undefined> {
+    Promise<PoolCode|undefined> {
     const [token0, token1] = t0.address.toLowerCase() < t1.address.toLowerCase() ? [t0, t1] : [t1, t0]
     const poolAddress = this._getPoolAddress(token0, token1)
     try {
       const pool = await new ethers.Contract(poolAddress, SushiPoolABI, this.chainDataProvider)
       const [reserve0, reserve1]:[BigNumber, BigNumber] = await this.limited.callOnce(() => pool.getReserves())      
-      return new ConstantProductRPool(poolAddress, token0, token1, 0.003, reserve0, reserve1)
+      const rPool = new ConstantProductRPool(poolAddress, token0, token1, 0.003, reserve0, reserve1)
+      return new ConstantProductPoolCode(rPool, 'Uniswap');
     } catch (e) {
       return undefined
     }
   }
   
-  async _getAllPools(tokens: Token[]): Promise<RPool[]> {
-    const poolData: Promise<RPool|undefined>[] = []
+  async _getAllPools(tokens: Token[]): Promise<PoolCode[]> {
+    const poolData: Promise<PoolCode|undefined>[] = []
     for (let i = 0; i < tokens.length; ++i) {
       for (let j = i+1; j < tokens.length; ++j) {
         poolData.push(this._getPoolData(tokens[i], tokens[j]))
       }
     }
     const pools = await Promise.all(poolData)
-    return pools.filter(p => p !== undefined) as RPool[]
+    return pools.filter(p => p !== undefined) as PoolCode[]
   }
 }

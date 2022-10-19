@@ -90,7 +90,6 @@ export class RouteRender {
         }]
 
         tokens.forEach ((t, i) => this.printToken(t, i))
-debugger
         this.printEdge(legs)
 
         this.svg.viewbox(this.bbox)
