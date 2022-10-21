@@ -4,8 +4,8 @@ import { HEXer } from "../HEXer";
 import { PoolCode } from "./PoolCode";
 
 export class BentoConstantProductPoolCode extends PoolCode {
-  constructor(pool: ConstantProductRPool) {
-    super(pool)
+  constructor(pool: ConstantProductRPool, providerName: string) {
+    super(pool, providerName)
   }
 
   getSwapCodeForRouteProcessor(leg: RouteLeg, route: MultiRoute, to: string): string {

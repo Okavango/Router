@@ -1,14 +1,14 @@
-import { BridgeBento, ConstantProductRPool, RouteLeg, RPool, RToken } from "@sushiswap/tines";
+import { BridgeBento, ConstantProductRPool, RToken } from "@sushiswap/tines";
 import {BigNumber, Contract, ethers} from 'ethers'
-import { LiquidityProvider, PoolRegistarator } from "./LiquidityProvider";
-import { getCreate2Address } from "ethers/lib/utils";
-import { keccak256, pack } from '@ethersproject/solidity'
-import { HEXer } from "../HEXer";
+import { LiquidityProvider } from "./LiquidityProvider";
 import { ChainId, Network, Token } from "../networks/Network";
 import { ConstantProductPoolFactoryABI } from "../../ABI/ConstantProductPoolFactoryABI";
 import { ConstantProductPoolABI } from "../../ABI/ConstantProductPoolABI";
 import { Limited } from "../Limited";
 import { BentoBoxABI } from "../../ABI/BentoBoxABI";
+import { PoolCode } from "../pools/PoolCode";
+import { BentoBridgePoolCode } from "../pools/BentoBridge";
+import { BentoConstantProductPoolCode } from "../pools/BentoconstantProductPool";
 
 const ConstantProductPoolFactory = {
   [ChainId.MATIC]: '0x05689fCfeE31FCe4a67FbC7Cab13E74F80A4E288',
@@ -42,16 +42,16 @@ function sortTokens(tokens: Token[]): Token[] {
 }
 
 export class TridentProvider extends LiquidityProvider {
-  pools: Map<string, RPool>
+  pools: Map<string, PoolCode>
   
-  constructor(r: PoolRegistarator, chainDataProvider: ethers.providers.BaseProvider, net: Network, l: Limited) {
-    super(r, chainDataProvider, net, l)
-    this.pools = new Map<string, RPool>()
+  constructor(chainDataProvider: ethers.providers.BaseProvider, net: Network, l: Limited) {
+    super(chainDataProvider, net, l)
+    this.pools = new Map<string, PoolCode>()
   }
 
   getPoolProviderName(): string {return 'Trident'}
 
-  async getPools(t0: Token, t1: Token): Promise<RPool[]> {
+  async getPools(t0: Token, t1: Token): Promise<PoolCode[]> {
     if (ConstantProductPoolFactory[this.network.chainId] === undefined) {
       // No trident for this network
       return []
@@ -61,97 +61,23 @@ export class TridentProvider extends LiquidityProvider {
     const bridges = await this._getAllBridges(tokens, tridentPools)
     const pools = tridentPools.concat(bridges)
 
-    this.registrator.addPools(pools.map(p => p.address), this)
-    this.registrator.addTokens(this._getAllBentoTokens(tridentPools).map(t => t.tokenId as string), this)
-    pools.forEach(p => this.pools.set(p.address, p))
+    pools.forEach(p => this.pools.set(p.pool.address, p))
     return pools
   }
 
-  _getCallCodeForRouteProcessor(contractAddress: string, callDataHex: string) {
-    const code = new HEXer()
-      .uint8(10).address(contractAddress)
-      .uint16(callDataHex.length/2)
-      .hexData(callDataHex).toString()
-    return code
-  }
-
-  getSwapCodeForRouteProcessor(leg: RouteLeg, toAddress: string, exactAmount?: BigNumber): string {
-    if (leg.poolAddress.startsWith('Bento')) {
-      const chainId = leg.tokenFrom.chainId
-      if (typeof chainId == 'string' && chainId.startsWith('Bento')) {
-        // From Bento
-        return this._getWithdrawalCode(leg, toAddress)
-      } else {
-        // To Bento
-        return this._getDepositCode(leg, toAddress, exactAmount)
-      }
-    } else {
-      return this._getswapCode(leg, toAddress)
-    }
-  }
-
-  _getDepositCode(leg: RouteLeg, toAddress: string, exactAmount?: BigNumber): string {
-    if (exactAmount === undefined) {
-      throw new Error('_getDepositCode undefined exactAmount')
-    } else {
-      const code = new HEXer()
-          .uint8(20).address(toAddress)
-          .uint(exactAmount).toString()
-      console.assert(code.length == 53*2, "BentoBridge deposit unexpected code length")
-      return code
-    }
-  }
-
-  _getWithdrawalCode(leg: RouteLeg, toAddress: string): string {
-    const code = new HEXer()
-      .uint8(23)
-      .address(leg.tokenFrom.address)
-      .address(toAddress)
-      .share16(1) // TODO !!!!
-      .toString()
-    console.assert(code.length == 43*2, "BentoBridge withdraw unexpected code length")
-    return code
-  }
-
-  // TODO: Only ConstantProductPool
-  _getswapCode(leg: RouteLeg, toAddress: string): string {
-    const coder = new ethers.utils.AbiCoder()
-    // TODO: add unwrap bento = true variant 
-    // address tokenIn, address recipient, bool unwrapBento
-    const poolData = coder.encode(["address", "address", "bool"], [leg.tokenFrom.address, toAddress, false])
-    const code = new HEXer()
-      .uint8(21)
-      .address(leg.poolAddress)
-      .bytes(poolData)
-      .toString()
-      
-    return code
-  }
-
-  getTokenSendCodeFromRouteProcessor(leg: RouteLeg, toAddress: string, share: number): string {
-    const code = new HEXer()
-      .uint8(22)
-      .address(leg.tokenFrom.address)
-      .address(toAddress)
-      .share16(share)
-      .toString()
-    console.assert(code.length == 43*2, "BentoBridge withdraw unexpected code length")
-    return code
-  }
-
-  async _getTokenPairPools(
+  async _getTokenPaiPoolCodes(
     t0: Token, t1: Token, factory: Contract
-  ): Promise<RPool[]> {
-    const pools:RPool[] = []
-    const pairPoolsCount = await this.limited.call(
+  ): Promise<PoolCode[]> {
+    const pools:PoolCode[] = []
+    const paiPoolCodesCount = await this.limited.call(
       () => factory.poolsCount(t0.address, t1.address)
     )
-    if (pairPoolsCount == 0) return []
-    const pairPools: string[] = await this.limited.call(
-      () => factory.getPools(t0.address, t1.address, 0, pairPoolsCount)
+    if (paiPoolCodesCount == 0) return []
+    const paiPoolCodes: string[] = await this.limited.call(
+      () => factory.getPools(t0.address, t1.address, 0, paiPoolCodesCount)
     )
-    for (let k = 0; k < pairPools.length; ++k) {
-      const poolAddress = pairPools[k]
+    for (let k = 0; k < paiPoolCodes.length; ++k) {
+      const poolAddress = paiPoolCodes[k]
       const poolContract = await new ethers.Contract(poolAddress, ConstantProductPoolABI, this.chainDataProvider)
       const [res0, res1]: [BigNumber, BigNumber] = await this.limited.call(() => poolContract.getReserves())
       const fee: BigNumber = await this.limited.call(() => poolContract.swapFee())
@@ -163,23 +89,24 @@ export class TridentProvider extends LiquidityProvider {
         res0,
         res1
       )
-      pools.push(pool)
+      const poolCode = new BentoConstantProductPoolCode(pool, this.getPoolProviderName())
+      pools.push(poolCode)
     }
     return pools
   }
 
-  async _getAllPools(tokens: Token[]): Promise<RPool[]> {
+  async _getAllPools(tokens: Token[]): Promise<PoolCode[]> {
     const factory = await new Contract(
       ConstantProductPoolFactory[this.network.chainId], 
       ConstantProductPoolFactoryABI, 
       this.chainDataProvider
     )
-    const promises: Promise<RPool[]>[] = []
+    const promises: Promise<PoolCode[]>[] = []
     const tokensSorted = sortTokens(tokens)
     for (let i = 0; i < tokensSorted.length; ++i) {
       for (let j = i+1; j < tokensSorted.length; ++j) {
         promises.push(
-          this._getTokenPairPools(tokensSorted[i], tokensSorted[j], factory)
+          this._getTokenPaiPoolCodes(tokensSorted[i], tokensSorted[j], factory)
         )
       }
     }
@@ -188,21 +115,21 @@ export class TridentProvider extends LiquidityProvider {
     return pools
   }
 
-  _getAllBentoTokens(pools: RPool[]): RToken[] {
+  _getAllBentoTokens(pools: PoolCode[]): RToken[] {
     const tokenBentoMap = new Map<string, RToken>()
     pools.forEach(p => {
-      tokenBentoMap.set(p.token0.tokenId as string, p.token0)
-      tokenBentoMap.set(p.token1.tokenId as string, p.token1)
+      tokenBentoMap.set(p.pool.token0.tokenId as string, p.pool.token0)
+      tokenBentoMap.set(p.pool.token1.tokenId as string, p.pool.token1)
     })
 
     return Array.from(tokenBentoMap.values())
   }
 
-  async _getAllBridges(tokens:RToken[], pools: RPool[]): Promise<RPool[]> {
+  async _getAllBridges(tokens:RToken[], poolCodes: PoolCode[]): Promise<PoolCode[]> {
     const tokenBentoMap = new Map<string, RToken>()
-    pools.forEach(p => {
-      tokenBentoMap.set(p.token0.tokenId as string, p.token0)
-      tokenBentoMap.set(p.token1.tokenId as string, p.token1)
+    poolCodes.forEach(p => {
+      tokenBentoMap.set(p.pool.token0.tokenId as string, p.pool.token0)
+      tokenBentoMap.set(p.pool.token1.tokenId as string, p.pool.token1)
     })
 
     const tokenOutputMap = new Map<string, RToken>()
@@ -216,13 +143,14 @@ export class TridentProvider extends LiquidityProvider {
     const promises = Array.from(tokenBentoMap.values()).map(async t => {
       const totals: {elastic: BigNumber, base: BigNumber} = 
         await this.limited.call(() => BentoContract.totals(t.address))
-      return new BridgeBento(
+      const pool = new BridgeBento(
         `Bento bridge for ${t.symbol}`,
         tokenOutputMap.get(t.address) as RToken,
         t,
         totals.elastic,
         totals.base
       )
+      return new BentoBridgePoolCode(pool, this.getPoolProviderName(), BentoBox[this.network.chainId])
     })
 
     return await Promise.all(promises)
@@ -239,18 +167,4 @@ export class TridentProvider extends LiquidityProvider {
      return Array.from(set)
   }
 
-  getLegStartPoint(leg: RouteLeg): string {
-    if (leg.poolAddress.startsWith('Bento')) {  // Bridge
-      const chainId = leg.tokenFrom.chainId
-      if (typeof chainId == 'string' && chainId.startsWith('Bento')) {
-        // From Bento
-        return 'RouteProcessor'
-      } else {
-        // To Bento
-        return BentoBox[this.network.chainId]
-      }
-    } else {
-      return leg.poolAddress
-    }
-  }
 }

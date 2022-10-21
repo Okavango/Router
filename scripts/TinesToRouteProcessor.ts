@@ -38,31 +38,41 @@ export class TinesToRouteProcessor {
     this.calcTokenOutputLegs(route)
     let res = '0x'
 
+    // 1. Initial distribution
     const [initialCode, exactAmount] = this.codeDistributeInitial(route)
     res += initialCode
 
     const distributedTokens = new Set([route.fromToken.tokenId])
     route.legs.forEach(l => {
-      // 2.1 Transfer tokens from the routeProcessor contract to the pool if it is neccessary
+      // 2. Transfer tokens from the routeProcessor contract to the pool if it is neccessary
       if (!distributedTokens.has(l.tokenFrom.tokenId)) {
         res += this.codeDistributeTokenShares(l.tokenFrom, route)
         distributedTokens.add(l.tokenFrom.tokenId)
       }
 
-      // 2.2 Make swap
-      let outAddress
-      const outputDistribution = this.tokenOutputLegs.get(l.tokenTo.tokenId as string) || []
-      if (outputDistribution.length == 0) {
-        outAddress = toAddress
-      } else if (outputDistribution.length == 1) {
-        outAddress = this.getPoolCode(outputDistribution[0]).getStartPoint(l, route)
-      } else {
-        outAddress = this.routeProcessorAddress
-      }
-      res += this.codeSwap(l, route, outAddress, exactAmount.get(l.tokenFrom.tokenId as string))
+      // 3. get pool's output address
+      const outAddress = this.getPoolOutputAddress(l, route, toAddress)
+
+      // 4. Make swap
+      res += this.codeSwap(l, route, outAddress, exactAmount.get(l.poolAddress))
     })
 
     return res;
+  }
+
+  getPoolOutputAddress(l: RouteLeg, route: MultiRoute, toAddress: string): string {
+    let outAddress
+    const outputDistribution = this.tokenOutputLegs.get(l.tokenTo.tokenId as string) || []
+    if (outputDistribution.length == 0) {
+      outAddress = toAddress
+    } else if (outputDistribution.length == 1) {
+      outAddress = this.getPoolCode(outputDistribution[0]).getStartPoint(l, route)
+      if (outAddress == PoolCode.RouteProcessorAddress)
+        outAddress = this.routeProcessorAddress
+    } else {
+      outAddress = this.routeProcessorAddress
+    }
+    return outAddress
   }
 
  /* // Transfers tokens from msg.sender to a pool
@@ -115,7 +125,7 @@ export class TinesToRouteProcessor {
           getBigNumber(route.amountIn * leg.absolutePortion) : route.amountInBN.sub(inputAmountPrevious)
       hex.address(poolAddress).uint(amount)
       inputAmountPrevious = inputAmountPrevious.add(amount)
-      exactAmount.set(poolAddress, amount)
+      exactAmount.set(leg.poolAddress, amount)      
     })
     const code = hex.toString()
     console.assert(code.length == (2 + legsAddr.length*52)*2, "codeDistributeInitial unexpected code length")

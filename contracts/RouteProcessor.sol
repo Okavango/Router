@@ -52,17 +52,13 @@ contract RouteProcessor {
         (, position) = swapUniswapPool(route, position + 1);
 
       } else if (commandCode == 20) {
-        uint transferAmount;
-        (transferAmount, position) = bentoDepositAmountFromBento(tokenIn, route, position + 1);
-        amountInAcc += transferAmount;        
+        position = bentoDepositAmountFromBento(tokenIn, route, position + 1);
       } else if (commandCode == 21) {
         position = swapTrident(route, position + 1);
       } else if (commandCode == 22) {
         position = bentoSend(route, position + 1);
       } else if (commandCode == 23) {
-        uint transferAmount;
-        (transferAmount, position) = bentoWithdrawShareFromRP(tokenIn, route, position + 1);
-        amountInAcc += transferAmount;
+        position = bentoWithdrawShareFromRP(tokenIn, route, position + 1);
       } else if (commandCode == 24) { // distribute Bento tokens from msg.sender to an address
         uint transferAmount;
         (transferAmount, position) = distributeBentoShares(tokenIn, route, position + 1);
@@ -123,8 +119,9 @@ contract RouteProcessor {
   // Transfers input tokens from BentoBox to a pool.
   // Expected to be launched for initial liquidity distribution from user to Bento, so we know exact amounts
   function bentoDepositAmountFromBento(address token, bytes memory route, uint position) 
-    private returns (uint amount, uint positionAfter) {
+    private returns (uint positionAfter) {
     address to;
+    uint amount;
     assembly {
       route := add(route, position)
       to := mload(add(route, 20))
@@ -132,7 +129,6 @@ contract RouteProcessor {
       positionAfter := add(position, 52)
     }
 
-    //IERC20(token).transferFrom(msg.sender, address(BentoBox), amount);
     BentoBox.deposit(token, address(BentoBox), to, amount, 0);
   }
 
@@ -156,8 +152,9 @@ contract RouteProcessor {
 
   // Withdraw Bento tokens from Bento to an address.
   function bentoWithdrawShareFromRP(address token, bytes memory route, uint position)
-    private returns (uint amount, uint positionAfter) {
+    private returns (uint positionAfter) {
     address to;
+    uint amount;
     assembly {
       route := add(route, position)
       to := mload(add(route, 20))
