@@ -4,11 +4,11 @@ import { BigNumber } from "ethers";
 // RPool extention for RP coding
 export abstract class PoolCode {
   pool: RPool
-  providerName: string
+  poolName: string
 
-  constructor(pool: RPool, providerName: string) {
+  constructor(pool: RPool, poolName: string) {
     this.pool = pool
-    this.providerName = providerName
+    this.poolName = poolName
   }
 
   static RouteProcessorAddress = 'RouteProcessor'

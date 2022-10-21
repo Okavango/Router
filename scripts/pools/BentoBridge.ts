@@ -5,9 +5,9 @@ import { PoolCode } from "./PoolCode";
 
 export class BentoBridgePoolCode extends PoolCode {
   BentoBoxAddress: string
-  
+
   constructor(pool: BridgeBento, providerName: string, BentoBoxAddress: string) {
-    super(pool, providerName)
+    super(pool, `BentoBridge`)
     this.BentoBoxAddress = BentoBoxAddress
   }
 

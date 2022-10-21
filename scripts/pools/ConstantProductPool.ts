@@ -3,8 +3,8 @@ import { HEXer } from "../HEXer";
 import { PoolCode } from "./PoolCode";
 
 export class ConstantProductPoolCode extends PoolCode {
-  constructor(pool: ConstantProductRPool, provederName: string) {
-    super(pool, provederName)
+  constructor(pool: ConstantProductRPool, providerName: string) {
+    super(pool, `${providerName} ${pool.fee*100}%`)
   }
 
   getSwapCodeForRouteProcessor(leg: RouteLeg, route: MultiRoute, to: string): string {

@@ -85,6 +85,9 @@ const config: HardhatUserConfig = {
       live: false,
       saveDeployments: true,
       tags: ["test", "local"],
+      accounts: {
+        accountsBalance: "10000000000000000000000000" //(10_000_000 ETH).
+      },
     },
     ethereum: {
       url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,

@@ -5,7 +5,7 @@ import { PoolCode } from "./PoolCode";
 
 export class BentoConstantProductPoolCode extends PoolCode {
   constructor(pool: ConstantProductRPool, providerName: string) {
-    super(pool, providerName)
+    super(pool, `${providerName} ${pool.fee*100}%`)
   }
 
   getSwapCodeForRouteProcessor(leg: RouteLeg, route: MultiRoute, to: string): string {

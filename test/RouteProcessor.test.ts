@@ -50,13 +50,14 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
   })
 
   console.log("6. Create Route ...")
-  console.log(`    Input: ${route.amountInBN} ${route.fromToken.name}`);    
+  console.log(`    Input: ${amountIn} ${route.fromToken.name}`);    
   route.legs.forEach(l => {
     console.log(
       `    ${l.tokenFrom.name} ${Math.round(l.absolutePortion*100)}%`
-      + ` ${swapper.getPoolsProviderName(l.poolAddress)} -> ${l.tokenTo.name}`);
+      + ` -> [${swapper.getPoolsProviderName(l.poolAddress)}] -> ${l.tokenTo.name}`);
   })
-  console.log(`    Output: ${route.amountOutBN} ${route.toToken.name}`);
+  const output = Math.round(parseInt(route.amountOutBN.toString())/Math.pow(10, toToken.decimals)*100)/100
+  console.log(`    Output: ${output} ${route.toToken.name}`);
 
   console.log('7. Create route processor code ...');    
   const code = swapper.getRouteProcessorCode(route, Alice.address)
@@ -125,7 +126,7 @@ describe("RouteProcessor", async function () {
   it("Polygon WMATIC => FEI check", async function () {
     const forking_url = (network.config as HardhatNetworkConfig)?.forking?.url;
     if (forking_url !== undefined && forking_url.search('polygon') >= 0) {
-      await testRouteProcessor(POLYGON, 9, POLYGON.tokens.SUSHI)
+      await testRouteProcessor(POLYGON, 1_000_000, POLYGON.tokens.SUSHI)
     }
   })
 });

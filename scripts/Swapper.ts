@@ -59,7 +59,7 @@ export class Swapper {
 
   getPoolsProviderName(poolAddress: string): string {
     const pc = this.pools.get(poolAddress) as PoolCode
-    return pc.providerName
+    return pc.poolName
   }
 
 }
