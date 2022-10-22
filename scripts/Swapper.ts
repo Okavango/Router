@@ -7,6 +7,7 @@ import { UniswapProvider } from "./liquidityProviders/UniswapV2";
 import { convertTokenToBento, getBentoChainId, TridentProvider } from "./liquidityProviders/Trident";
 import { Limited } from "./Limited";
 import { PoolCode } from "./pools/PoolCode";
+import { QuickSwapProvider } from "./liquidityProviders/QuickSwap";
 
 export class Swapper {
   routeProcessor: string
@@ -27,9 +28,10 @@ export class Swapper {
 
   async getRoute(tokenIn: Token, amountIn: BigNumber, tokenOut: Token): Promise<MultiRoute> {
     const providers = [
-      // new SushiProvider(this.chainDataProvider, this.network, this.limited),
-      // new UniswapProvider(this.chainDataProvider, this.network, this.limited),
+      new SushiProvider(this.chainDataProvider, this.network, this.limited),
+      new UniswapProvider(this.chainDataProvider, this.network, this.limited),
       new TridentProvider(this.chainDataProvider, this.network, this.limited),
+      new QuickSwapProvider(this.chainDataProvider, this.network, this.limited),
     ]
     const poolsPromises = providers.map(p => p.getPools(tokenIn, tokenOut))
     const poolsArrays = await Promise.all(poolsPromises)
