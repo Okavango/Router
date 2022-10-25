@@ -9,15 +9,13 @@ import "../interfaces/IPool.sol";
 import "hardhat/console.sol";
 
 
-// TODO: to add bento liquidity limits because of strategies
-contract RouteProcessor2 {
+contract RouteProcessorWithoutSlotsDraining {
   IBentoBoxMinimal immutable BentoBox;
 
   constructor(address _BentoBox) {
     BentoBox = IBentoBoxMinimal(_BentoBox);
   }
 
-  // TODO: reduce else/if gas
   // To be used in UI. For External Owner Account only
   function processRouteEOA(
     address tokenIn,

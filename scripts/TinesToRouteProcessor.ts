@@ -75,21 +75,6 @@ export class TinesToRouteProcessor {
     return outAddress
   }
 
- /* // Transfers tokens from msg.sender to a pool
-  codeTransferERC20(token: RToken, poolAddress: string, amount: BigNumber): string {
-    const code = new HEXer().uint8(1).address(poolAddress).uint(amount).toString()
-    console.assert(code.length == 53*2, "codeTransferERC20 unexpected code length")
-    return code
-  }
-
-  // Sends tokens from the RouteProcessor to a pool
-  codeSendERC20(token: RToken, poolAddress: string, share: number): string {
-    const code = new HEXer().uint8(2).address(token.address)
-      .address(poolAddress).share16(share).toString()
-    console.assert(code.length == 43*2, "codeSendERC20 unexpected code length")
-    return code
-  }*/
-
   getPoolCode(l: RouteLeg): PoolCode {
     const pc = this.pools.get(l.poolAddress)
     if (pc === undefined) {
@@ -103,7 +88,6 @@ export class TinesToRouteProcessor {
     return pc.getSwapCodeForRouteProcessor(leg, route, to, exactAmount)
   }
 
-  //TODO: use 1 transfer optimization
   // Distributes tokens from msg.sender to pools
   codeDistributeInitial(route: MultiRoute): [string, Map<string, BigNumber>] {
     const legs = this.tokenOutputLegs.get(route.fromToken.tokenId as string) as RouteLeg[]
@@ -113,8 +97,12 @@ export class TinesToRouteProcessor {
       return [l, startPoint == PoolCode.RouteProcessorAddress ? this.routeProcessorAddress : startPoint]
     })
 
+    const command =  getTokenType(route.fromToken) == TokenType.ERC20 ? 
+      3     // distributeERC20Amounts
+      : 24  // distributeBentoShares
+      
     const hex = new HEXer()
-      .uint8(getTokenType(route.fromToken) == TokenType.ERC20 ? 3 : 24)
+      .uint8(command)
       .uint8(legsAddr.length)
 
     let inputAmountPrevious: BigNumber = BigNumber.from(0)
@@ -148,8 +136,12 @@ export class TinesToRouteProcessor {
       throw new Error('More than one RouteProcessor for a token is not supported')
     }
 
+    const command = getTokenType(token) == TokenType.ERC20 ? 
+      4     // distributeERC20Shares
+      : 25  // distributeBentoPortions
+
     const hex = new HEXer()
-      .uint8(getTokenType(token) == TokenType.ERC20 ? 4 : 25)
+      .uint8(command)
       .address(token.address)
       .uint8(legs.length - RPStartPointsNum)
 

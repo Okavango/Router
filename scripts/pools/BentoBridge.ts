@@ -24,7 +24,8 @@ export class BentoBridgePoolCode extends PoolCode {
       if (leg.tokenFrom.tokenId === route.fromToken.tokenId) {  // input token with exactAmount
         if (exactAmount !== undefined) {
           const code = new HEXer()
-          .uint8(20).address(to)
+          .uint8(20)    // bentoDepositAmountFromBento
+          .address(to)
           .uint(exactAmount).toString()
           console.assert(code.length == 53*2, "BentoBridge deposit unexpected code length")
           return code
@@ -33,7 +34,8 @@ export class BentoBridgePoolCode extends PoolCode {
         }
       } else {  // deposit in the middle of a route
         const code = new HEXer()
-          .uint8(26).address(to)
+          .uint8(26)      // bentoDepositAllFromBento
+          .address(to)
           .address(leg.tokenFrom.address).toString()
           console.assert(code.length == 41*2, "BentoBridge deposit unexpected code length")
           return code
@@ -42,7 +44,7 @@ export class BentoBridgePoolCode extends PoolCode {
       if (leg.tokenFrom.tokenId === route.fromToken.tokenId) {  // input token with exactAmount
         if (exactAmount !== undefined) {
           const code = new HEXer()
-            .uint8(23)
+            .uint8(23)    // bentoWithdrawShareFromRP
             .address(to)
             .uint(exactAmount)
             .toString()
@@ -53,7 +55,7 @@ export class BentoBridgePoolCode extends PoolCode {
         }
       } else {  // withdraw in the middle of a route
         const code = new HEXer()
-          .uint8(27)
+          .uint8(27)      // bentoWithdrawAllFromRP
           .address(leg.tokenFrom.address)
           .address(to)
           .toString()

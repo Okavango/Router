@@ -14,7 +14,7 @@ export class BentoConstantProductPoolCode extends PoolCode {
     // address tokenIn, address recipient, bool unwrapBento
     const poolData = coder.encode(["address", "address", "bool"], [leg.tokenFrom.address, to, false])
     const code = new HEXer()
-      .uint8(21)
+      .uint8(21)    // swapTrident
       .address(leg.poolAddress)
       .bytes(poolData)
       .toString()

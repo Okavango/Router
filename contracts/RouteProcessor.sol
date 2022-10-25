@@ -9,7 +9,6 @@ import "../interfaces/IPool.sol";
 import "hardhat/console.sol";
 
 
-// TODO: to add bento liquidity limits because of strategies
 contract RouteProcessor {
   IBentoBoxMinimal immutable BentoBox;
 
@@ -17,7 +16,6 @@ contract RouteProcessor {
     BentoBox = IBentoBoxMinimal(_BentoBox);
   }
 
-  // TODO: reduce else/if gas
   // To be used in UI. For External Owner Account only
   function processRouteEOA(
     address tokenIn,
@@ -35,13 +33,7 @@ contract RouteProcessor {
     uint position = 0;  // current reading position in route
     while(position < route.length) {
       uint8 commandCode = uint8(route[position]);
-      if        (commandCode == 1) { // transfer ERC20 tokens from msg.sender to an address
-        uint transferAmount;
-        (transferAmount, position) = transferERC20Amount(tokenIn, route, position + 1);
-        amountInAcc += transferAmount;
-      } else if (commandCode == 2) { // send ERC20 tokens from this router to an address
-        position = sendERC20Share(route, position + 1);
-      } else if (commandCode == 3) { // distribute ERC20 tokens from msg.sender to an address
+      if (commandCode == 3) { // distribute ERC20 tokens from msg.sender to an address
         uint transferAmount;
         (transferAmount, position) = distributeERC20Amounts(tokenIn, route, position + 1);
         amountInAcc += transferAmount;
@@ -55,8 +47,6 @@ contract RouteProcessor {
         position = bentoDepositAmountFromBento(tokenIn, route, position + 1);
       } else if (commandCode == 21) {
         position = swapTrident(route, position + 1);
-      } else if (commandCode == 22) {
-        position = bentoSend(route, position + 1);
       } else if (commandCode == 23) {
         position = bentoWithdrawShareFromRP(tokenIn, route, position + 1);
       } else if (commandCode == 24) { // distribute Bento tokens from msg.sender to an address
@@ -78,42 +68,6 @@ contract RouteProcessor {
     require(balanceFinal >= balanceInitial + amountOutMin, "Minimal ouput balance violation");
 
     amountOut = balanceFinal - balanceInitial;
-  }
-
-  // Send ERC20 tokens from this router to an address. Quantity for sending is determined by share in 1/65535.
-  // During routing we can't predict in advance the actual value of internal swaps because of slippage,
-  // so we have to work with shares - not fixed amounts
-  function sendERC20Share(bytes memory route, uint position) private returns (uint positionAfter) {
-    address token;
-    address to;
-    uint16 share;
-    assembly {
-      route := add(route, position)
-      token := mload(add(route, 20))
-      to := mload(add(route, 40))
-      share := mload(add(route, 42))
-      positionAfter := add(position, 42)
-    }
-
-    uint amount; unchecked {
-      amount = IERC20(token).balanceOf(address(this))*share/65535;
-    }
-    IERC20(token).transfer(to, amount);
-  }
-
-  // Transfers input tokens from msg.sender to an address. Tokens should be approved
-  // Expected to be launched for initial liquidity distribution fro user to pools, so we know exact amounts
-  function transferERC20Amount(address token, bytes memory route, uint position) 
-    private returns (uint amount, uint positionAfter) {
-    address to;
-    assembly {
-      route := add(route, position)
-      to := mload(add(route, 20))
-      amount := mload(add(route, 52))
-      positionAfter := add(position, 52)
-    }
-
-    IERC20(token).transferFrom(msg.sender, to, amount);
   }
 
   // Transfers input tokens from BentoBox to a pool.
@@ -195,26 +149,6 @@ contract RouteProcessor {
     positionAfter = position + 52 + swapDataSize;
 
     IPool(pool).swap(swapData);
-  }
-
-  // Thansfer Bento shares token from routeProcessor to 'to'
-  function bentoSend(bytes memory data, uint position) 
-    private returns (uint positionAfter) {
-    address token;
-    address to;
-    uint16 portion;
-    assembly {
-      data := add(data, position)
-      token := mload(add(data, 20))
-      to := mload(add(data, 40))
-      portion := mload(add(data, 42))
-      positionAfter := add(position, 42)
-    }
-
-    uint shares; unchecked {
-      shares = BentoBox.balanceOf(token, address(this))*portion/65535;
-    }
-    BentoBox.transfer(token, address(this), to, shares);
   }
 
   // Sushi/Uniswap pool swap
