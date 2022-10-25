@@ -51,9 +51,9 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
 
   console.log("6. Create Route ...")
   console.log(`    Input: ${amountIn} ${route.fromToken.name}`);    
-  route.legs.forEach(l => {
+  route.legs.forEach((l, i) => {
     console.log(
-      `    ${l.tokenFrom.name} ${Math.round(l.absolutePortion*100)}%`
+      `    ${i+1}. ${l.tokenFrom.name} ${Math.round(l.absolutePortion*100)}%`
       + ` -> [${swapper.getPoolsProviderName(l.poolAddress)}] -> ${l.tokenTo.name}`);
   })
   const output = Math.round(parseInt(route.amountOutBN.toString())/Math.pow(10, toToken.decimals)*100)/100

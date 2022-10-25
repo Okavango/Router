@@ -33,34 +33,39 @@ contract RouteProcessor {
     uint position = 0;  // current reading position in route
     while(position < route.length) {
       uint8 commandCode = uint8(route[position]);
-      if (commandCode == 3) { // distribute ERC20 tokens from msg.sender to an address
-        uint transferAmount;
-        (transferAmount, position) = distributeERC20Amounts(tokenIn, route, position + 1);
-        amountInAcc += transferAmount;
-      } else if (commandCode == 4) { // distribute ERC20 tokens from this router to an address
-        position = distributeERC20Shares(route, position + 1);
-
-      } else if (commandCode == 10) { // Sushi/Uniswap pool swap
-        (, position) = swapUniswapPool(route, position + 1);
-
-      } else if (commandCode == 20) {
-        position = bentoDepositAmountFromBento(tokenIn, route, position + 1);
-      } else if (commandCode == 21) {
-        position = swapTrident(route, position + 1);
-      } else if (commandCode == 23) {
-        position = bentoWithdrawShareFromRP(tokenIn, route, position + 1);
-      } else if (commandCode == 24) { // distribute Bento tokens from msg.sender to an address
-        uint transferAmount;
-        (transferAmount, position) = distributeBentoShares(tokenIn, route, position + 1);
-        amountInAcc += transferAmount;
-      } else if (commandCode == 25) {
-        position = distributeBentoPortions(route, position + 1);
-      } else if (commandCode == 26) {
-        position = bentoDepositAllFromBento(route, position + 1);
-      } else if (commandCode == 27) {
-        position = bentoWithdrawAllFromRP(route, position + 1);
-
-      } else revert("Unknown command code");
+      if (commandCode < 20) {
+        if (commandCode == 10) { // Sushi/Uniswap pool swap
+          (, position) = swapUniswapPool(route, position + 1);
+        } else if (commandCode == 3) { // distribute ERC20 tokens from msg.sender to an address
+          uint transferAmount;
+          (transferAmount, position) = distributeERC20Amounts(tokenIn, route, position + 1);
+          amountInAcc += transferAmount;
+        } else if (commandCode == 4) { // distribute ERC20 tokens from this router to an address
+          position = distributeERC20Shares(route, position + 1);
+        } else revert("Unknown command code");
+      } else {
+        if (commandCode < 24) {
+          if (commandCode == 20) {
+            position = bentoDepositAmountFromBento(tokenIn, route, position + 1);
+          } else if (commandCode == 21) {
+            position = swapTrident(route, position + 1);
+          } else if (commandCode == 23) {
+            position = bentoWithdrawShareFromRP(tokenIn, route, position + 1);
+          } else revert("Unknown command code");
+        } else {
+          if (commandCode == 24) { // distribute Bento tokens from msg.sender to an address
+            uint transferAmount;
+            (transferAmount, position) = distributeBentoShares(tokenIn, route, position + 1);
+            amountInAcc += transferAmount;
+          } else if (commandCode == 25) {
+            position = distributeBentoPortions(route, position + 1);
+          } else if (commandCode == 26) {
+            position = bentoDepositAllFromBento(route, position + 1);
+          } else if (commandCode == 27) {
+            position = bentoWithdrawAllFromRP(route, position + 1);
+          } else revert("Unknown command code");
+        }
+      }
     }
 
     require(amountInAcc == amountIn, "Wrong amountIn value");
