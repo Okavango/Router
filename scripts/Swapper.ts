@@ -30,8 +30,8 @@ export class Swapper {
     const providers = [
       new SushiProvider(this.chainDataProvider, this.network, this.limited),
       new UniswapProvider(this.chainDataProvider, this.network, this.limited),
-      new TridentProvider(this.chainDataProvider, this.network, this.limited),
       new QuickSwapProvider(this.chainDataProvider, this.network, this.limited),
+      new TridentProvider(this.chainDataProvider, this.network, this.limited),
     ]
     const poolsPromises = providers.map(p => p.getPools(tokenIn, tokenOut))
     const poolsArrays = await Promise.all(poolsPromises)

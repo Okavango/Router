@@ -18,7 +18,7 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
   console.log(`1. ${net.name} RouteProcessor deployment ...`);  
   const provider = new ethers.providers.AlchemyProvider(...net.alchemyProviderArgs)  
   const RouteProcessor: RouteProcessor__factory = await ethers.getContractFactory(
-    "RouteProcessor"
+    "RouteProcessorStream"
   );
   const routeProcessor = await RouteProcessor.deploy(
     BentoBox[net.chainId] || "0x0000000000000000000000000000000000000000"
