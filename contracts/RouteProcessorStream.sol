@@ -15,8 +15,8 @@ contract RouteProcessorStream {
     BentoBox = IBentoBoxMinimal(_BentoBox);
   }
 
-  // To be used in UI. For External Owner Account only
-  function processRouteEOA(
+  // To be used in UI. For External Owner Accounts only
+  function processRoute(
     address tokenIn,
     uint amountIn,
     address tokenOut,
@@ -30,47 +30,24 @@ contract RouteProcessorStream {
     uint balanceInitial = IERC20(tokenOut).balanceOf(to);
 
     uint stream = createStream(route);
-    uint position = 0;  // current reading position in route
-    while(position < route.length) {
+    while(isNotEmpty(stream)) {
       uint8 commandCode = readUint8(stream);
       if (commandCode < 20) {
-        if (commandCode == 10) { 
-          // Sushi/Uniswap pool swap
-          swapUniswapPool(stream);
-        } else if (commandCode == 3) { 
-          // distribute ERC20 tokens from msg.sender to initial pools
-          amountInAcc += distributeERC20Amounts(stream, tokenIn);
-        } else if (commandCode == 4) { 
-          // distribute ERC20 tokens from this router to pools
-          distributeERC20Shares(stream);
-        } else revert("Unknown command code");
-        position = getPosition(route, stream);
+        if (commandCode == 10) swapUniswapPool(stream); // Sushi/Uniswap pool swap
+        else if (commandCode == 3) amountInAcc += distributeERC20Amounts(stream, tokenIn); // initial distribution
+        else if (commandCode == 4) distributeERC20Shares(stream);  // distribute ERC20 tokens from this router to pools
+        else revert("Unknown command code");
+      } else if (commandCode < 24) {
+        if (commandCode == 20) bentoDepositAmountFromBento(stream, tokenIn);
+        else if (commandCode == 21) swapTrident(stream);
+        else if (commandCode == 23) bentoWithdrawShareFromRP(stream, tokenIn);
+        else revert("Unknown command code");
       } else {
-        if (commandCode < 24) {
-          if (commandCode == 20) {
-            bentoDepositAmountFromBento(stream, tokenIn);
-          } else if (commandCode == 21) {
-            swapTrident(stream);
-          } else if (commandCode == 23) {
-            bentoWithdrawShareFromRP(stream, tokenIn);
-          } else revert("Unknown command code");
-          position = getPosition(route, stream);
-        } else {
-          if (commandCode == 24) {
-            // distribute Bento tokens from msg.sender to pools
-            amountInAcc += distributeBentoShares(stream, tokenIn);
-            position = getPosition(route, stream);
-          } else if (commandCode == 25) {
-            distributeBentoPortions(stream);
-            position = getPosition(route, stream);
-          } else if (commandCode == 26) {
-            bentoDepositAllFromBento(stream);
-            position = getPosition(route, stream);
-          } else if (commandCode == 27) {
-            bentoWithdrawAllFromRP(stream);
-            position = getPosition(route, stream);
-          } else revert("Unknown command code");
-        }
+        if (commandCode == 24) amountInAcc += distributeBentoShares(stream, tokenIn);
+        else if (commandCode == 25) distributeBentoPortions(stream);
+        else if (commandCode == 26) bentoDepositAllFromBento(stream);
+        else if (commandCode == 27) bentoWithdrawAllFromRP(stream);
+        else revert("Unknown command code");
       }
     }
 
@@ -210,33 +187,20 @@ contract RouteProcessorStream {
     assembly {
       stream := mload(0x40)
       mstore(0x40, add(stream, 64))
-      stream := add(stream, 32)
       mstore(stream, data)
       let length := mload(data)
       mstore(add(stream, 32), add(data, length))
     }
   }
 
-  function isNotEmpty(uint stream) private view returns (bool) {
+  function isNotEmpty(uint stream) private pure returns (bool) {
     uint pos;
     uint finish;
     assembly {
       pos := mload(stream)
       finish := mload(add(stream, 32))
     }
-    console.log(stream, pos, finish, pos < finish);
     return pos < finish;
-  }
-
-  function createStreamWithPosition(bytes memory data, uint position) private pure returns (uint stream) {
-    assembly {
-      stream := mload(0x40)
-      mstore(0x40, add(stream, 64))
-      stream := add(stream, 32)
-      mstore(stream, add(data, position))
-      let length := mload(data)
-      mstore(add(stream, 32), add(data, length))
-    }
   }
 
   function getPosition(bytes memory data, uint stream) private pure returns (uint pos) {

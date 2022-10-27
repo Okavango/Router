@@ -71,7 +71,7 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
     
     const toTokenContract = await new ethers.Contract(toToken.address, WETH9ABI, Alice)
     const balanceOutBNBefore = await toTokenContract.connect(Alice).balanceOf(Alice.address)
-    const tx = await routeProcessor.processRouteEOA(
+    const tx = await routeProcessor.processRoute(
       net.baseWrappedToken.address, 
       amountInBN, 
       toToken.address, 
@@ -111,7 +111,7 @@ describe("RouteProcessor", async function () {
 
       console.log(code);
       
-      await routeProcessor.processRouteEOA(
+      await routeProcessor.processRoute(
         POLYGON.tokens.WMATIC.address, 
         0, 
         POLYGON.tokens.WMATIC.address, 

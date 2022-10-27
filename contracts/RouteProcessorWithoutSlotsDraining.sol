@@ -17,7 +17,7 @@ contract RouteProcessorWithoutSlotsDraining {
   }
 
   // To be used in UI. For External Owner Account only
-  function processRouteEOA(
+  function processRoute(
     address tokenIn,
     uint amountIn,
     address tokenOut,
