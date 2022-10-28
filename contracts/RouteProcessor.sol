@@ -8,7 +8,6 @@ import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/IPool.sol";
 import "hardhat/console.sol";
 
-
 contract RouteProcessor {
   IBentoBoxMinimal immutable BentoBox;
 
@@ -16,7 +15,7 @@ contract RouteProcessor {
     BentoBox = IBentoBoxMinimal(_BentoBox);
   }
 
-  // To be used in UI. For External Owner Account only
+  // To be used in UI. For External Owner Accounts only
   function processRoute(
     address tokenIn,
     uint amountIn,
@@ -30,41 +29,25 @@ contract RouteProcessor {
     uint amountInAcc = 0;
     uint balanceInitial = IERC20(tokenOut).balanceOf(to);
 
-    uint position = 0;  // current reading position in route
-    while(position < route.length) {
-      uint8 commandCode = uint8(route[position]);
+    uint stream = createStream(route);
+    while(isNotEmpty(stream)) {
+      uint8 commandCode = readUint8(stream);
       if (commandCode < 20) {
-        if (commandCode == 10) { // Sushi/Uniswap pool swap
-          (, position) = swapUniswapPool(route, position + 1);
-        } else if (commandCode == 3) { // distribute ERC20 tokens from msg.sender to an address
-          uint transferAmount;
-          (transferAmount, position) = distributeERC20Amounts(tokenIn, route, position + 1);
-          amountInAcc += transferAmount;
-        } else if (commandCode == 4) { // distribute ERC20 tokens from this router to an address
-          position = distributeERC20Shares(route, position + 1);
-        } else revert("Unknown command code");
+        if (commandCode == 10) swapUniswapPool(stream); // Sushi/Uniswap pool swap
+        else if (commandCode == 3) amountInAcc += distributeERC20Amounts(stream, tokenIn); // initial distribution
+        else if (commandCode == 4) distributeERC20Shares(stream);  // distribute ERC20 tokens from this router to pools
+        else revert("Unknown command code");
+      } else if (commandCode < 24) {
+        if (commandCode == 20) bentoDepositAmountFromBento(stream, tokenIn);
+        else if (commandCode == 21) swapTrident(stream);
+        else if (commandCode == 23) bentoWithdrawShareFromRP(stream, tokenIn);
+        else revert("Unknown command code");
       } else {
-        if (commandCode < 24) {
-          if (commandCode == 20) {
-            position = bentoDepositAmountFromBento(tokenIn, route, position + 1);
-          } else if (commandCode == 21) {
-            position = swapTrident(route, position + 1);
-          } else if (commandCode == 23) {
-            position = bentoWithdrawShareFromRP(tokenIn, route, position + 1);
-          } else revert("Unknown command code");
-        } else {
-          if (commandCode == 24) { // distribute Bento tokens from msg.sender to an address
-            uint transferAmount;
-            (transferAmount, position) = distributeBentoShares(tokenIn, route, position + 1);
-            amountInAcc += transferAmount;
-          } else if (commandCode == 25) {
-            position = distributeBentoPortions(route, position + 1);
-          } else if (commandCode == 26) {
-            position = bentoDepositAllFromBento(route, position + 1);
-          } else if (commandCode == 27) {
-            position = bentoWithdrawAllFromRP(route, position + 1);
-          } else revert("Unknown command code");
-        }
+        if (commandCode == 24) amountInAcc += distributeBentoShares(stream, tokenIn);
+        else if (commandCode == 25) distributeBentoPortions(stream);
+        else if (commandCode == 26) bentoDepositAllFromBento(stream);
+        else if (commandCode == 27) bentoWithdrawAllFromRP(stream);
+        else revert("Unknown command code");
       }
     }
 
@@ -77,31 +60,16 @@ contract RouteProcessor {
 
   // Transfers input tokens from BentoBox to a pool.
   // Expected to be launched for initial liquidity distribution from user to Bento, so we know exact amounts
-  function bentoDepositAmountFromBento(address token, bytes memory route, uint position) 
-    private returns (uint positionAfter) {
-    address to;
-    uint amount;
-    assembly {
-      route := add(route, position)
-      to := mload(add(route, 20))
-      amount := mload(add(route, 52))
-      positionAfter := add(position, 52)
-    }
-
+  function bentoDepositAmountFromBento(uint stream, address token) private {
+    address to = readAddress(stream);
+    uint amount = readUint(stream);
     BentoBox.deposit(token, address(BentoBox), to, amount, 0);
   }
 
   // Transfers all input tokens from BentoBox to a pool
-  function bentoDepositAllFromBento(bytes memory route, uint position) 
-    private returns (uint positionAfter) {
-    address to;
-    address token;
-    assembly {
-      route := add(route, position)
-      to := mload(add(route, 20))
-      token := mload(add(route, 40))
-      positionAfter := add(position, 40)
-    }
+  function bentoDepositAllFromBento(uint stream) private {
+    address to = readAddress(stream);
+    address token = readAddress(stream);
 
     uint amount = IERC20(token).balanceOf(address(BentoBox))
       + BentoBox.strategyData(token).balance
@@ -110,67 +78,33 @@ contract RouteProcessor {
   }
 
   // Withdraw Bento tokens from Bento to an address.
-  function bentoWithdrawShareFromRP(address token, bytes memory route, uint position)
-    private returns (uint positionAfter) {
-    address to;
-    uint amount;
-    assembly {
-      route := add(route, position)
-      to := mload(add(route, 20))
-      amount := mload(add(route, 52))
-      positionAfter := add(position, 52)
-    }
-
+  function bentoWithdrawShareFromRP(uint stream, address token) private {
+    address to = readAddress(stream);
+    uint amount = readUint(stream);
     BentoBox.withdraw(token, address(this), to, amount, 0);
   }
 
   // Withdraw all Bento tokens from Bento to an address.
-  function bentoWithdrawAllFromRP(bytes memory route, uint position) private returns (uint positionAfter) {
-    address token;
-    address to;
-    assembly {
-      route := add(route, position)
-      token := mload(add(route, 20))
-      to := mload(add(route, 40))
-      positionAfter := add(position, 40)
-    }
-
+  function bentoWithdrawAllFromRP(uint stream) private {
+    address token = readAddress(stream);
+    address to = readAddress(stream);
     uint amount = BentoBox.balanceOf(token, address(this));
     BentoBox.withdraw(token, address(this), to, amount, 0);
   }
 
   // Trident pool swap
-  function swapTrident(bytes memory data, uint position) 
-    private returns (uint positionAfter) {
-    address pool;
-    bytes memory swapData;
-    uint swapDataSize;
-    assembly {
-      data := add(data, position)
-      pool := mload(add(data, 20))
-      swapData := add(data, 52)
-      swapDataSize := mload(swapData)
-    }
-    positionAfter = position + 52 + swapDataSize;
-
+  function swapTrident(uint stream) private {
+    address pool = readAddress(stream);
+    bytes memory swapData = readBytes(stream);
     IPool(pool).swap(swapData);
   }
 
   // Sushi/Uniswap pool swap
-  function swapUniswapPool(bytes memory data, uint position) 
-    private returns (uint amountOut, uint positionAfter) {
-    address pool;
-    address tokenIn;
-    uint8 direction;
-    address to;
-    assembly {
-      data := add(data, position)
-      pool := mload(add(data, 20))
-      tokenIn := mload(add(data, 40))
-      direction := mload(add(data, 41))
-      to := mload(add(data, 61))
-      positionAfter := add(position, 61)
-    }
+  function swapUniswapPool(uint stream) private returns (uint amountOut) {
+    address pool = readAddress(stream);
+    address tokenIn = readAddress(stream);
+    uint8 direction = readUint8(stream);
+    address to = readAddress(stream);
 
     (uint r0, uint r1,) = IUniswapV2Pair(pool).getReserves();
     require(r0 > 0 && r1 > 0, 'Wrong pool reserves');
@@ -185,113 +119,145 @@ contract RouteProcessor {
 
   // Distributes input ERC20 tokens from msg.sender to addresses. Tokens should be approved
   // Expected to be launched for initial liquidity distribution from user to pools, so we know exact amounts
-  function distributeERC20Amounts(address token, bytes memory route, uint position) 
-    private returns (uint amountTotal, uint positionAfter) {
-    uint8 num;
-    assembly {
-      route := add(route, add(position, 1))
-      num := mload(route)
-    }
-
+  function distributeERC20Amounts(uint stream, address token) private returns (uint amountTotal) {
+    uint8 num = readUint8(stream);
     amountTotal = 0;
-    address to;  
-    uint amount;  
     for (uint i = 0; i < num; ++i) {
-      assembly {
-        to := mload(add(route, 20))
-        route := add(route, 52)
-        amount := mload(route)
-        amountTotal := add(amountTotal, amount)
-      }
+      address to = readAddress(stream);
+      uint amount = readUint(stream);
+      amountTotal += amount;
       IERC20(token).transferFrom(msg.sender, to, amount);
     }
-    positionAfter = position + 1 + uint(num)*52;
   }
 
   // Distributes input Bento tokens from msg.sender to addresses. Tokens should be approved
   // Expected to be launched for initial liquidity distribution from user to pools, so we know exact amounts
-  function distributeBentoShares(address token, bytes memory route, uint position) 
-    private returns (uint sharesTotal, uint positionAfter) {
-    uint8 num;
-    assembly {
-      route := add(route, add(position, 1))
-      num := mload(route)
-    }
-
+  function distributeBentoShares(uint stream, address token) private returns (uint sharesTotal) {
+    uint8 num = readUint8(stream);
     sharesTotal = 0;
-    address to;  
-    uint share;  
     for (uint i = 0; i < num; ++i) {
-      assembly {
-        to := mload(add(route, 20))
-        route := add(route, 52)
-        share := mload(route)
-        sharesTotal := add(sharesTotal, share)
-      }
+      address to = readAddress(stream);
+      uint share = readUint(stream);
+      sharesTotal += share;
       BentoBox.transfer(token, msg.sender, to, share);
     }
-    positionAfter = position + 1 + uint(num)*52;
   }
 
   // Distribute ERC20 tokens from this routeProcessor to addresses. 
   // Quantity for sending is determined by share in 1/65535.
   // During routing we can't predict in advance the actual value of internal swaps because of slippage,
   // so we have to work with shares - not fixed amounts
-  function distributeERC20Shares(bytes memory route, uint position) 
-    private returns (uint positionAfter) {
-    uint8 num;
-    address token;
-    assembly {
-      route := add(route, position)
-      token := mload(add(route, 20))
-      route := add(route, 21)
-      num := mload(route)
-    }
+  function distributeERC20Shares(uint stream) private {
+    address token = readAddress(stream);
+    uint8 num = readUint8(stream);
     uint amountTotal = IERC20(token).balanceOf(address(this));
 
-    address to;  
     for (uint i = 0; i < num; ++i) {
-      uint amount;  
-      assembly {
-        to := mload(add(route, 20))
-        route := add(route, 22)
-        let share := and(mload(route), 0xffff)
-        amount := div(mul(amountTotal, share), 65535)
-        amountTotal := sub(amountTotal, amount)
+      address to = readAddress(stream); 
+      uint16 share = readUint16(stream);
+      unchecked {
+        uint amount = amountTotal * share / 65535;
+        amountTotal -= amount;
+        IERC20(token).transfer(to, amount);
       }
-      IERC20(token).transfer(to, amount);
     }
-    positionAfter = position + 21 + uint(num)*22;
   }
 
   // Distribute Bento tokens from this routeProcessor to addresses. 
   // Quantity for sending is determined by portions in 1/65535.
   // During routing we can't predict in advance the actual value of internal swaps because of slippage,
   // so we have to work with portions - not fixed amounts
-  function distributeBentoPortions(bytes memory route, uint position) 
-    private returns (uint positionAfter) {
-    uint8 num;
-    address token;
-    assembly {
-      route := add(route, position)
-      token := mload(add(route, 20))
-      route := add(route, 21)
-      num := mload(route)
-    }
+  function distributeBentoPortions(uint stream) private {
+    address token = readAddress(stream);
+    uint8 num = readUint8(stream);
     uint amountTotal = BentoBox.balanceOf(token, address(this));
 
-    address to;  
     for (uint i = 0; i < num; ++i) {
-      uint amount;  
-      assembly {
-        to := mload(add(route, 20))
-        route := add(route, 22)
-        let share := and(mload(route), 0xffff)
-        amount := div(mul(amountTotal, share), 65535)
-        amountTotal := sub(amountTotal, amount)
+      address to = readAddress(stream);
+      uint16 share = readUint16(stream);
+      unchecked {
+        uint amount = amountTotal * share / 65535;
+        amountTotal -= amount;
+        BentoBox.transfer(token, address(this), to, amount);
       }
-      BentoBox.transfer(token, address(this), to, amount);
     }
-    positionAfter = position + 21 + uint(num)*22;
   }
+
+
+// ===================== Stream operations ======================
+
+  function createStream(bytes memory data) private pure returns (uint stream) {
+    assembly {
+      stream := mload(0x40)
+      mstore(0x40, add(stream, 64))
+      mstore(stream, data)
+      let length := mload(data)
+      mstore(add(stream, 32), add(data, length))
+    }
+  }
+
+  function isNotEmpty(uint stream) private pure returns (bool) {
+    uint pos;
+    uint finish;
+    assembly {
+      pos := mload(stream)
+      finish := mload(add(stream, 32))
+    }
+    return pos < finish;
+  }
+
+  function readUint8(uint stream) private pure returns (uint8 res) {
+    assembly {
+      let pos := mload(stream)
+      pos := add(pos, 1)
+      res := mload(pos)
+      mstore(stream, pos)
+    }
+  }
+
+  function readUint16(uint stream) private pure returns (uint16 res) {
+    assembly {
+      let pos := mload(stream)
+      pos := add(pos, 2)
+      res := mload(pos)
+      mstore(stream, pos)
+    }
+  }
+
+  function readUint32(uint stream) private pure returns (uint32 res) {
+    assembly {
+      let pos := mload(stream)
+      pos := add(pos, 4)
+      res := mload(pos)
+      mstore(stream, pos)
+    }
+  }
+
+  function readUint(uint stream) private pure returns (uint res) {
+    assembly {
+      let pos := mload(stream)
+      pos := add(pos, 32)
+      res := mload(pos)
+      mstore(stream, pos)
+    }
+  }
+
+  function readAddress(uint stream) public pure returns (address res) {
+    assembly {
+      let pos := mload(stream)
+      pos := add(pos, 20)
+      res := mload(pos)
+      mstore(stream, pos)
+    }
+  }
+
+  function readBytes(uint stream) public pure returns (bytes memory res) {
+    assembly {
+      let pos := mload(stream)
+      res := add(pos, 32)
+      let length := mload(res)
+      mstore(stream, add(res, length))
+    }
+  }
+
 }
