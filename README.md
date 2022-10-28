@@ -1,6 +1,6 @@
 # Universal RouterProcessor Proof of Concept
 
-## Liquidity sources supports
+## Liquidity sources support
 
     - Sushiswap
     - Uniswap
