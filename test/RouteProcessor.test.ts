@@ -10,8 +10,35 @@ import { HardhatNetworkConfig } from "hardhat/types";
 import { HEXer } from "../scripts/HEXer";
 import { ERC20ABI } from "../ABI/ERC20";
 import { BentoBox } from "../scripts/liquidityProviders/Trident";
+import { Contract } from "ethers";
+import { BentoBoxABI } from "../ABI/BentoBoxABI";
 
 const delay = async ms => new Promise(res => setTimeout(res, ms));
+
+async function BentoMakeTokenStrategyPercentage(
+  net: Network,
+  token: string, 
+  percentage: number
+) {
+  await network.provider.request({
+    method: "hardhat_impersonateAccount",
+    params: ["0x850a57630a2012b2494779fbc86bbc24f2a7baef"],
+  });
+  const bentoOwner = await ethers.getSigner('0x850a57630a2012b2494779fbc86bbc24f2a7baef') // polygon
+
+  const [_, John] = await ethers.getSigners()
+  await John.sendTransaction({ 
+    to: bentoOwner.address,
+    value: getBigNumber(1e18)
+  })
+
+  const BentoContract = await new Contract(
+    BentoBox[net.chainId], 
+    BentoBoxABI, 
+    bentoOwner//chainDataProvider
+  )
+  await BentoContract.setStrategyTargetPercentage(token, percentage)
+}
 
 // Swaps amountIn basewrappedToken(WETH, ...) to toToken
 async function testRouteProcessor(net: Network, amountIn: number, toToken: Token, swaps = 1) {
@@ -55,6 +82,7 @@ async function testRouteProcessor(net: Network, amountIn: number, toToken: Token
     console.log(
       `    ${i+1}. ${l.tokenFrom.name} ${Math.round(l.absolutePortion*100)}%`
       + ` -> [${swapper.getPoolsProviderName(l.poolAddress)}] -> ${l.tokenTo.name}`);
+    //console.log(l.poolAddress, l.assumedAmountIn, l.assumedAmountOut)
   })
   const output = Math.round(parseInt(route.amountOutBN.toString())/Math.pow(10, toToken.decimals)*100)/100
   console.log(`    Output: ${output} ${route.toToken.name}`);
@@ -140,6 +168,14 @@ describe("RouteProcessor", async function () {
     const forking_url = (network.config as HardhatNetworkConfig)?.forking?.url;
     if (forking_url !== undefined && forking_url.search('polygon') >= 0) {
       await testRouteProcessor(POLYGON, 1000000, POLYGON.tokens.SUSHI, 5)
+    }
+  })
+
+  it.skip("Polygon 5 swaps test", async function () {
+    const forking_url = (network.config as HardhatNetworkConfig)?.forking?.url;
+    if (forking_url !== undefined && forking_url.search('polygon') >= 0) {
+      BentoMakeTokenStrategyPercentage(POLYGON, POLYGON.tokens.USDC.address, 95)  
+      await testRouteProcessor(POLYGON, 1_000_000, POLYGON.tokens.USDC)
     }
   })
 });

@@ -89,7 +89,7 @@ contract RouteProcessor {
     address token = readAddress(stream);
     address to = readAddress(stream);
     uint amount = BentoBox.balanceOf(token, address(this));
-    BentoBox.withdraw(token, address(this), to, amount, 0);
+    BentoBox.withdraw(token, address(this), to, 0, amount);
   }
 
   // Trident pool swap
