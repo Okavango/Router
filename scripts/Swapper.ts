@@ -12,14 +12,21 @@ import { QuickSwapProvider } from "./liquidityProviders/QuickSwap";
 export class Swapper {
   routeProcessor: string
   chainDataProvider: ethers.providers.BaseProvider
+  forkProvider: Provider
   network: Network
   poolsNumber: {[network: string]: number}
   limited: Limited
   pools: Map<string, PoolCode>
 
-  constructor(routeProcessor: string, chainDataProvider: ethers.providers.BaseProvider, net: Network) {
+  constructor(
+    routeProcessor: string, 
+    chainDataProvider: ethers.providers.BaseProvider, 
+    forkProvider: Provider, 
+    net: Network
+  ) {
     this.routeProcessor = routeProcessor
     this.chainDataProvider = chainDataProvider
+    this.forkProvider = forkProvider
     this.network = net
     this.poolsNumber = {}
     this.limited = new Limited(12, 1000)    // Free Alchemy account allows 330/26 eth_calls per second
@@ -31,7 +38,7 @@ export class Swapper {
       new SushiProvider(this.chainDataProvider, this.network, this.limited),
       new UniswapProvider(this.chainDataProvider, this.network, this.limited),
       new QuickSwapProvider(this.chainDataProvider, this.network, this.limited),
-      new TridentProvider(this.chainDataProvider, this.network, this.limited),
+      new TridentProvider(this.chainDataProvider, this.forkProvider, this.network, this.limited),
     ]
     const poolsPromises = providers.map(p => p.getPools(tokenIn, tokenOut))
     const poolsArrays = await Promise.all(poolsPromises)

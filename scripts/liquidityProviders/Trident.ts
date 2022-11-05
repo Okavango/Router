@@ -9,6 +9,7 @@ import { BentoBoxABI } from "../../ABI/BentoBoxABI";
 import { PoolCode } from "../pools/PoolCode";
 import { BentoBridgePoolCode } from "../pools/BentoBridge";
 import { BentoConstantProductPoolCode } from "../pools/BentoconstantProductPool";
+import { ERC20ABI } from "../../ABI/ERC20";
 
 const ConstantProductPoolFactory = {
   [ChainId.MATIC]: '0x05689fCfeE31FCe4a67FbC7Cab13E74F80A4E288',
@@ -43,10 +44,12 @@ function sortTokens(tokens: Token[]): Token[] {
 
 export class TridentProvider extends LiquidityProvider {
   pools: Map<string, PoolCode>
+  forkProvider: Provider
   
-  constructor(chainDataProvider: ethers.providers.BaseProvider, net: Network, l: Limited) {
+  constructor(chainDataProvider: ethers.providers.BaseProvider, forkProvider: Provider, net: Network, l: Limited) {
     super(chainDataProvider, net, l)
     this.pools = new Map<string, PoolCode>()
+    this.forkProvider = forkProvider
   }
 
   getPoolProviderName(): string {return 'Trident'}
@@ -143,12 +146,19 @@ export class TridentProvider extends LiquidityProvider {
     const promises = Array.from(tokenBentoMap.values()).map(async t => {
       const totals: {elastic: BigNumber, base: BigNumber} = 
         await this.limited.call(() => BentoContract.totals(t.address))
+      const TokenContract = await new Contract(
+        t.address, 
+        ERC20ABI, 
+        this.forkProvider
+      )      
+      const max: BigNumber = await this.limited.call(() => TokenContract.balanceOf(BentoBox[this.network.chainId]))
       const pool = new BridgeBento(
         `Bento bridge for ${t.symbol}`,
         tokenOutputMap.get(t.address) as RToken,
         t,
         totals.elastic,
-        totals.base
+        totals.base,
+        max
       )
       return new BentoBridgePoolCode(pool, this.getPoolProviderName(), BentoBox[this.network.chainId])
     })
